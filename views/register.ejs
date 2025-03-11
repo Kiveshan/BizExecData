@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Company</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* General styling */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Navbar styling */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: white;
+            border-bottom: 1px solid #ccc;
+            position: fixed;
+            width: 98%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        /* Logo styling */
+        .navbar .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .navbar .logo img {
+            height: 50px;
+            margin-right: 10px;
+        }
+
+        .navbar .logo h3 {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00BDD6;
+            margin: 0;
+        }
+
+        /* Navbar links styling */
+        .navbar .nav-links {
+            list-style: none;
+            display: flex;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar .nav-links li {
+            margin-left: 20px;
+        }
+
+        .navbar .nav-links li a {
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 8px 15px;
+            background-color: #00BDD6;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .navbar .nav-links li a:hover {
+            background-color: #009bb0;
+        }
+
+        /* Center the form container */
+        .form-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            margin-top: 150px; /* Adjusted to ensure space below navbar */
+        }
+
+        form {
+            background-color: #f7f7f7;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 700px; /* Increased max-width for wider form */
+        }
+
+        form h1 {
+            font-size: 22px;
+            color: #00BDD6;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        form h2 {
+            font-size: 14px;
+            color: gray;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* Styling for the form fields */
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="tel"],
+        select {
+            width: calc(100% - 24px); /* Adjust width for padding */
+            padding: 15px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        /* Create Account button */
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #00BDD6;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        button:hover {
+            background-color: #009bb0;
+        }
+
+        /* Login link styling */
+        p {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: gray;
+        }
+
+        p a {
+            color: #00BDD6;
+            text-decoration: none;
+        }
+
+        p a:hover {
+            text-decoration: underline;
+        }
+
+        /* Additional fields visibility */
+        .additional-fields {
+            display: none;
+        }
+
+        /* Group fields in a compact layout */
+        .field-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .field-group input,
+        .field-group select {
+            flex: 1 1 48%; /* Adjusted to make textboxes wider */
+        }
+
+        .field-group input.full-width,
+        .field-group select.full-width {
+            flex: 1 1 100%;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="logo">
+                <a href="/homepage">
+                    <img src="logo_biz.png" alt="Navbar Logo">
+                </a>
+                <h3>Business Executive Data</h3>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/login">Login</a></li>
+                <li><a href="/register">Register</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="form-container">
+        <form id="registerForm" action="/register" method="post">
+            <h1>Register Company</h1>
+            <h2>Company Owner? Register your company account.</h2>
+            <div class="field-group">
+                <input type="text" name="firstname" placeholder="First Name" required>
+                <input type="text" name="surname" placeholder="Surname" required>
+                <input type="text" name="company_name" placeholder="Company Name" required>
+            </div>
+            <div class="field-group">
+                <input type="email" name="email" placeholder="Company Email" required>
+            </div>
+            <div class="field-group">
+                <input type="text" name="address" placeholder="Address" required>
+                <input type="tel" name="telephone" placeholder="Telephone" required>
+            </div>
+            <div class="field-group">
+                <input type="password" id="password" name="password" placeholder="Password" required>
+                <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+            </div>
+            <div class="field-group">
+                <select name="accounting_software" id="accounting_software" required>
+                    <option value="">Select Accounting Software</option>
+                    <option value="quickbooks">QuickBooks</option>
+                    <option value="excel">Excel</option>
+                    <option value="zero">Zero</option>
+                </select>
+            </div>
+            <div class="additional-fields" id="quickbooks-fields">
+                <input type="text" name="clientid" placeholder="Client ID">
+                <input type="text" name="clientsecret" placeholder="Client Secret">
+                <input type="text" name="redirecturl" placeholder="Redirect URL">
+            </div>
+            <input type="text" name="company_services" placeholder="Products/Services" class="full-width" required>
+            <button type="submit">Create Account</button>
+            <p>Already have an account? <a href="/login">Login</a></p>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('accounting_software').addEventListener('change', function() {
+            const additionalFields = document.getElementById('quickbooks-fields');
+            if (this.value === 'quickbooks') {
+                additionalFields.style.display = 'block';
+            } else {
+                additionalFields.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

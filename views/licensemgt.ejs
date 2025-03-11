@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./style.css">
+    <title>License Management</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #00BDD6;
+            padding: 10px 20px;
+            color: white;
+        }
+
+        /* Back button styling */
+        .back-button {
+            background-color: green;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .back-button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Logout button styling */
+        .logout-button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .logout-button:hover {
+            background-color: #c0392b;
+        }
+
+        /* Content */
+        .content {
+            padding: 20px;
+            background-color: #ecf0f1;
+            flex-grow: 1;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th, table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        table th {
+            background-color: #00BDD6;
+            color: white;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        table tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Action button */
+        .action-button {
+            background-color: #00BDD6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .action-button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Ensure link inside button is styled */
+        .action-button a {
+            color: white;
+            text-decoration: none;
+            display: block;
+        }
+
+        .action-button a:hover {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="/adminmenu" class="back-button">Back</a>
+        <h1>License Management</h1>
+        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+            <button class="logout-button" type="submit">Logout</button>
+        </form>
+    </div>
+
+    <div class="content">
+        <table>
+            <thead>
+                <tr>
+                    <th>Application ID</th>
+                    <th>Business Owner Name</th>
+                    <th>Company Name</th>
+                    <th>Date Submitted</th>
+                    <th>Status</th>
+                    <th>Valid up to</th>
+                    <th>Reminder</th>
+                    <th>Description</th>
+                    <th colspan="2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% licenses.forEach(license => { %>
+                    <tr>
+                        <td><%= license.licenseid %></td>
+                        <td><%= license.owner_name %></td>
+                        <td><%= license.company_name %></td>
+                    
+                        <% if (license.date_submitted) { %>
+                            <td><%= new Date(license.date_submitted).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
+                        <% } else { %>
+                            <td></td>
+                        <% } %>
+                    
+                        <td><%= license.status %></td>
+                    
+                        <% if (license.expiration_date) { %>
+                            <td><%= new Date(license.expiration_date).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
+                        <% } else { %>
+                            <td></td>
+                        <% } %>
+                        
+                        <!-- Unique ids by appending licenseid -->
+                        <td><input type="text" id="eventTitle_<%= license.licenseid %>" placeholder="Reminder"></td>
+                        <td><input type="text" id="eventDescription_<%= license.licenseid %>" placeholder="Event Description"></td>
+                        
+                        <td>
+                            <td>
+                                <button class="action-button" id="addEvent" onclick="window.location='/renew/<%= license.userid %>'">Renew</button>
+                            </td>
+                            
+                        </td>
+            
+                        <td>
+                            <button class="action-button" id="addEvent" onclick="window.location='/deactivate/<%= license.userid %>'">Deactivate</button>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+            
+        </table>
+
+        <div id="reminder-section">
+            <h3>Reminders</h3>
+            <ul id="reminderList">
+                <li data-event-id="1">
+                    <strong>Event Title</strong>
+                    - Event Description on Event Date
+                    <button class="delete-event" onclick="deleteEvent(1)">Delete</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="right">
+        <h3 id="monthAndYear"></h3>
+        <div class="button-container-calendar">
+            <button id="previous" onclick="previous()">‹</button>
+            <button id="next" onclick="next()">›</button>
+        </div>
+        <table class="table-calendar" id="calendar" data-lang="en">
+            <thead id="thead-month"></thead>
+            <tbody id="calendar-body"></tbody>
+        </table>
+        <div class="footer-container-calendar">
+            <label for="month">Jump To: </label>
+            <select id="month" onchange="jump()">
+                <option value=0>Jan</option>
+                <option value=1>Feb</option>
+                <option value=2>Mar</option>
+                <option value=3>Apr</option>
+                <option value=4>May</option>
+                <option value=5>Jun</option>
+                <option value=6>Jul</option>
+                <option value=7>Aug</option>
+                <option value=8>Sep</option>
+                <option value=9>Oct</option>
+                <option value=10>Nov</option>
+                <option value=11>Dec</option>
+            </select>
+            <select id="year" onchange="jump()"></select>
+        </div>
+    </div>
+
+    
+</body>
+</html>

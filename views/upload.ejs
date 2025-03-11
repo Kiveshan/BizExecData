@@ -1,0 +1,115 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Upload Profit and Loss Excel File</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Header */
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            background-color: #00BDD6;
+            padding: 5px 10px;
+            color: white;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #00BDD6;
+            margin-bottom: 20px;
+        }
+
+        /* Simple Logout button *
+
+        /* Form */
+        .excel-upload {
+            background-color: #ecf0f1;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            width: 100%;
+        }
+
+        .upload {
+            background-color: #00BDD6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+       .upload:hover {
+            background-color: #2980b9;
+        }
+
+        .main-content {
+        margin-top: 200px; /* Push content below the navbar */
+        margin-left: 0px; /* Adjust based on sidebar width */
+        padding: 20px;
+box-sizing: border-box;
+}
+
+    </style>
+</head>
+<body>
+    <!-- Header with Simple Logout Button -->
+  
+    <div id="navbar"></div>
+    <script>
+      // Load navbar.html into the div with id "navbar"
+      fetch('exnavbar.html')
+        .then(response => response.text())
+        .then(data => {
+          document.getElementById('navbar').innerHTML = data;
+        });
+    </script>
+  
+
+    
+    <div class="main-content">
+        <h1>Upload Profit and Loss Excel File</h1>
+
+
+        <% if (errorMessage) { %>
+            <div style="color: red; margin-bottom: 20px;">
+                <%= errorMessage %>
+            </div>
+        <% } %>
+        <form class="excel-form" action="/upload" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".xlsx, .xls, .xltx, .txt" required />
+            <button class="upload" type="submit">Upload File</button>
+        </form>
+    </div>
+
+</body>
+</html>
