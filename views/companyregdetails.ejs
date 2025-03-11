@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Registration Details</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; height: 100vh; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; align-items: center; background-color: #00BDD6; padding: 10px 20px; color: white; }
+        .back-button { background-color: green; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-size: 16px; }
+        .logout-button { background-color: #e74c3c; color: white; padding: 10px 20px; border-radius: 5px; }
+        .content { padding: 20px; background-color: #ecf0f1; flex-grow: 1; }
+        .details-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .details-table th, .details-table td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        .details-table th { background-color: #00BDD6; color: white; }
+        .action-buttons { margin-top: 20px; text-align: center; }
+        .approve-btn, .reject-btn { padding: 10px 20px; color: white; border-radius: 5px; border: none; font-size: 16px; cursor: pointer; }
+        .approve-btn { background-color: #00BDD6; }
+        .reject-btn { background-color: #e74c3c; }
+        .approve-btn:hover { background-color: #0193a5; }
+        .reject-btn:hover { background-color: #c0392b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/companyregapplications" class="back-button">Back</a>
+        <h1>Company Application Details</h1>
+        <form action="/logout?_method=DELETE" method="POST">
+            <button class="logout-button" type="submit">Logout</button>
+        </form>
+    </div>
+
+    <div class="content">
+        <table class="details-table">
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>User ID</td>
+                    <td><%= application.userid %></td>
+
+                <tr>
+                    <td>Company Name</td>
+                    <td><%= application.company_name %></td>
+                </tr>
+                <tr>
+                    <td>Company Email</td>
+                    <td><%= application.email %></td>
+                </tr>
+                <tr>
+                    <td>Address</td>
+                    <td><%= application.address %></td>
+                </tr>
+                <tr>
+                    <td>Telephone</td>
+                    <td><%= application.telephone %></td>
+                </tr>
+                <tr>
+                    <td>Accounting Software</td>
+                    <td><%= application.accounting_software %></td>
+                </tr>
+                <tr>
+                    <td>Products/Services</td>
+                    <td><%= application.company_services %></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="action-buttons">
+            <form action="/companyregdetails/approveUser/<%= application.userid %>" method="POST" style="display:inline;">
+                <button type="submit" class="approve-btn">Approve</button>
+            </form>
+            <form action="/companyregdetails/rejectUser/<%= application.userid %>" method="POST" style="display:inline;">
+                <button type="submit" class="reject-btn">Reject</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,193 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-image: url('/dashboard_back.jpg');
+    background-size: cover;
+    background-position: center;
+    height: 100vh;
+  }
+  
+  .sidebar {
+    height: 100%;
+    width: 250px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: whitesmoke;
+    padding-top: 20px;
+  }
+  
+  .sidebar a {
+    padding: 10px 15px;
+    text-decoration: none;
+    font-size: 18px;
+    color: black;
+    display: block;
+  }
+  
+  .sidebar a.active {
+    background-color: #016dcb;
+  }
+  
+  .sidebar a:hover {
+    background-color: #016dcb;
+  }
+  .sidebar .navbar-logo a:hover{
+    background-color: whitesmoke;
+  }
+  
+  .content {
+    margin-left: 250px;
+    padding: 10px;
+
+  }
+  
+  h2 {
+    color: black;
+  }
+  
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)); /* Three columns */
+    grid-gap: 20px;
+  }
+  
+  .tile {
+    background-color: #fff;
+    padding: 70px;
+    border-radius: 20px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center the content vertically */
+    align-items: center; /* Center the content horizontally */
+  }
+
+  .tile.span-two {
+    grid-column: span 2; /* Make the tile span two columns */
+  }
+  
+  .tile:hover {
+    transform: translateY(-5px);
+  }
+  
+  
+  .tile h3 {
+    margin-top: 0;
+    color: #333;
+    text-align: center;
+    align-items: center;
+  }
+  
+  .tile p {
+    margin-bottom: 0;
+    color: #666;
+    text-align: center;
+    align-items: center;
+
+  }
+  .material-symbols-outlined {
+    font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24
+  }
+  
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #0171d3;
+    color: #fff;
+    padding: 10px 0;
+    text-align: center;
+}
+
+  /* Style for the logout button */
+  .logout-form {
+    display: inline-block; 
+  }
+
+  .logout-button {
+    background-color: red; 
+    color: white; 
+    border: none; 
+    padding: 10px 20px;
+    cursor: pointer; 
+    border-radius: 5px; 
+    font-size: 16px; 
+  }
+
+  .logout-button:hover {
+    background-color: #d32f2f; 
+  }
+
+
+h1.green-bg {
+    background-color: rgb(37, 228, 37);
+    color: black;
+    padding: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 36px; /* You can adjust the font-size as needed */
+    margin: 0; /* Remove default margin */
+ /* Stick to the top of the screen */
+    width: 100%; /* Full width */
+}
+
+h1.white-bg {
+    background-color: white;
+    color: black;
+    padding: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 36px; /* You can adjust the font-size as needed */
+    margin: 0; /* Remove default margin */
+ /* Stick to the top of the screen */
+    width: 100%; /* Full width */
+}
+
+h1.white-bg + h1.green-bg {
+    margin-top: 50px; /* Adjust as needed to avoid overlapping */
+}
+h3.subheader{
+  color: grey;
+  justify-content: left;
+  align-items: center;
+}
+.notification-badge {
+  color: red;
+  border-radius: 50%;
+  font-size: 12px;
+  justify-content: center;
+  align-items: center;
+}
+.notification-badge img {
+  width: 20px; /* Adjust size as needed */
+  height: auto; /* Maintain aspect ratio */
+}
+img.cardimg{
+  /* Ensure image fills the container */
+  height: auto; /* Maintain aspect ratio */
+  border-radius: 10px 10px 0 0; /* Rounded corners only at the top */
+  object-fit: cover; /* Ensure image covers the entire container */
+  align-items: center;
+}
+.tile img {
+  width: 100%; /* Ensure image fills the container */
+  height: auto; /* Maintain aspect ratio */
+  border-radius: 10px 10px 0 0; /* Rounded corners only at the top */
+  object-fit: cover; /* Ensure image covers the entire container */
+  align-items: center;
+}
+.tile h4{
+  justify-content: left;
+  align-items: center;
+  color: grey;
+}

@@ -1,0 +1,492 @@
+.createprofile {
+    position: relative;
+    width: 1440px;
+    height: 1688px;
+    background-color: #ffffff;
+  }
+  
+  .createprofile .text-wrapper {
+    position: absolute;
+    top: 80px;
+    left: 403px;
+    font-family: "Manrope-Bold", Helvetica;
+    font-weight: 700;
+    color: #171a1f;
+    font-size: 100px;
+    letter-spacing: 0;
+    line-height: 130px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .container {
+    position: absolute;
+    width: 996px;
+    height: 1331px;
+    top: 268px;
+    left: 243px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0px 8px 17px #171a1f26, 0px 0px 2px #171a1f1f;
+  }
+  
+  .createprofile .button {
+    all: unset;
+    box-sizing: border-box;
+    position: absolute;
+    width: 359px;
+    height: 44px;
+    top: 1212px;
+    left: 92px;
+    background-color: #6d31ed;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0px 8px 17px #6d31ed26, 0px 0px 2px #6d31ed1f;
+  }
+  
+  .createprofile .div {
+    position: absolute;
+    top: 8px;
+    left: 153px;
+    font-family: "Manrope-Regular", Helvetica;
+    font-weight: 400;
+    color: #ffffff;
+    font-size: 16px;
+    letter-spacing: 0;
+    line-height: 26px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .text-wrapper-2 {
+    position: absolute;
+    top: -112px;
+    left: 378px;
+    font-family: "Lexend-Bold", Helvetica;
+    font-weight: 700;
+    color: #171a1f;
+    font-size: 32px;
+    text-align: center;
+    letter-spacing: 0;
+    line-height: 48px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .container-2 {
+    position: absolute;
+    width: 428px;   
+    height: 387px;
+    top: 54px;
+    left: 47px;
+    background-color: #f0f9ff;
+    border-radius: 4px;
+    box-shadow: 0px 0px 1px #171a1f12, 0px 0px 2px #171a1f1f;
+  }
+  
+  .createprofile .textbox {
+    top: 192px;
+    left: 33px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .overlap-group {
+    position: relative;
+    width: 366px;
+    height: 59px;
+    top: -4px;
+    left: -4px;
+    border-radius: 4px;
+    border: 5px solid;
+    border-color: #6d31ed33;
+  }
+  
+  .createprofile .text-wrapper-3 {
+    position: absolute;
+    top: 26px;
+    left: 11px;
+    font-family: "Manrope-Regular", Helvetica;
+    font-weight: 400;
+    color: #bdc1ca;
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 22px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .text-wrapper-4 {
+    position: absolute;
+    top: 2px;
+    left: 11px;
+    font-family: "Manrope-Bold", Helvetica;
+    font-weight: 700;
+    color: #424856;
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 22px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .overlap-wrapper {
+    top: 272px;
+    left: 30px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .dropdown-button {
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    top: 132px;
+    left: 32px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .text-wrapper-5 {
+    position: absolute;
+    top: 7px;
+    left: 12px;
+    font-family: "Manrope-Regular", Helvetica;
+    font-weight: 400;
+    color: #171a1f;
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 22px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .chevron-down-large {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    top: 11px;
+    left: 333px;
+  }
+  
+  .createprofile .text-wrapper-6 {
+    position: absolute;
+    top: 8px;
+    left: 9px;
+    font-family: "Lexend-SemiBold", Helvetica;
+    font-weight: 600;
+    color: #565d6d;
+    font-size: 20px;
+    letter-spacing: 0;
+    line-height: 30px;
+    white-space: nowrap;
+  }
+  
+  .createprofile .overlap-group-wrapper {
+    top: 56px;
+    left: 30px;
+    background-color: #f3f4f6;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .container-3 {
+    width: 922px;
+    height: 319px;
+    top: 532px;
+    left: 47px;
+    position: absolute;
+    background-color: #f0f9ff;
+    border-radius: 4px;
+    box-shadow: 0px 0px 1px #171a1f12, 0px 0px 2px #171a1f1f;
+  }
+  
+  .createprofile .div-wrapper {
+    top: 67px;
+    left: 20px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .textbox-2 {
+    top: 146px;
+    left: 438px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .textbox-3 {
+    top: 235px;
+    left: 20px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .textbox-4 {
+    top: 67px;
+    left: 438px;
+    background-color: #f3f4f6;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .textbox-5 {
+    top: 146px;
+    left: 20px;
+    background-color: #ffffff;
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .container-4 {
+    width: 428px;
+    height: 385px;
+    top: 56px;
+    left: 519px;
+    position: absolute;
+    background-color: #f0f9ff;
+    border-radius: 4px;
+    box-shadow: 0px 0px 1px #171a1f12, 0px 0px 2px #171a1f1f;
+  }
+  
+  .createprofile .overlap {
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    top: 192px;
+    left: 33px;
+    border-radius: 4px;
+  }
+  
+  .createprofile .textbox-6 {
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    top: 0;
+    left: 0;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .visibility-off {
+    top: 15px;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 321px;
+  }
+  
+  .createprofile .overlap-2 {
+    position: absolute;
+    width: 360px;
+    height: 53px;
+    top: 286px;
+    left: 33px;
+    border-radius: 4px;
+  }
+  
+  .createprofile .img {
+    top: 18px;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 321px;
+  }
+  
+  .createprofile .password-must {
+    position: absolute;
+    width: 243px;
+    top: 38px;
+    left: 44px;
+    font-family: "Manrope-Regular", Helvetica;
+    font-weight: 400;
+    color: #6d31ed;
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 22px;
+  }
+  
+  .createprofile .g-check {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    top: 58px;
+    left: 20px;
+  }
+  
+  .createprofile .overlap-3 {
+    position: absolute;
+    width: 24px;
+    height: 91px;
+    top: 82px;
+    left: 20px;
+  }
+  
+  .createprofile .g-check-2 {
+    top: 0;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 0;
+  }
+  
+  .createprofile .g-check-3 {
+    top: 23px;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 0;
+  }
+  
+  .createprofile .g-check-4 {
+    top: 44px;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 0;
+  }
+  
+  .createprofile .g-check-5 {
+    top: 67px;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    left: 0;
+  }
+  
+  .createprofile .container-5 {
+    width: 922px;
+    height: 276px;
+    top: 893px;
+    left: 37px;
+    position: absolute;
+    background-color: #f0f9ff;
+    border-radius: 4px;
+    box-shadow: 0px 0px 1px #171a1f12, 0px 0px 2px #171a1f1f;
+  }
+  
+  .createprofile .dropdown-button-2 {
+    top: 64px;
+    left: 490px;
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .dropdown-button-3 {
+    top: 156px;
+    left: 73px;
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .dropdown-button-4 {
+    top: 156px;
+    left: 489px;
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .dropdown-button-5 {
+    top: 216px;
+    left: 73px;
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .dropdown-button-6 {
+    top: 64px;
+    left: 73px;
+    position: absolute;
+    width: 360px;
+    height: 37px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid;
+    border-color: #6d31ed;
+  }
+  
+  .createprofile .button-2 {
+    all: unset;
+    box-sizing: border-box;
+    position: absolute;
+    width: 359px;
+    height: 44px;
+    top: 1212px;
+    left: 528px;
+    background-color: #6d31ed;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0px 8px 17px #6d31ed26, 0px 0px 2px #6d31ed1f;
+  }
+  
+  .createprofile .text-wrapper-7 {
+    position: absolute;
+    top: 8px;
+    left: 160px;
+    font-family: "Manrope-Regular", Helvetica;
+    font-weight: 400;
+    color: #ffffff;
+    font-size: 16px;
+    letter-spacing: 0;
+    line-height: 26px;
+    white-space: nowrap;
+  }
+
+
+   

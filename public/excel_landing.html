@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Page</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<style>
+/* General styling */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: white;
+    font-family: Arial, sans-serif;
+    overflow-x: hidden;
+}
+
+/* Navbar styling */
+.navbar {
+    display: flex;
+ /* Center logo and text */
+    align-items: center;
+    padding: 10px 20px;
+    background-color: white;
+    border-bottom: 1px solid #ccc;
+}
+
+.navbar .logo {
+    display: flex;
+    align-items: center;
+    margin: 0 auto;
+    margin-right: 0;
+}
+
+.navbar .logo img {
+    height: 80px; /* Increase logo size */
+    margin-right: 15px;
+}
+
+.navbar .logo h3 {
+    font-size: 30px; /* Increase font size */
+    font-weight: bold;
+    color: #06833a;
+    margin: 0;
+    text-align: center;
+}
+
+/* Navigation links styling */
+.navbar .nav-links {
+    list-style: none;
+    display: flex;
+    margin: 0;
+    padding: 0;
+}
+
+.navbar .nav-links li {
+    margin-left: 20px;
+}
+
+/* Style for the logout form, pushing it to the right */
+.logout-form {
+    margin-left: auto; /* Pushes logout button to the far right */
+}
+
+.logout-button {
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-bottom: 0px;
+    
+    transition: background-color 0.3s ease;
+}
+
+.logout-button:hover {
+    background-color: darkred;
+}
+.navbar .nav-links li a {
+    text-decoration: none;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    padding: 10px 20px;
+    background-color: #00BDD6;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.navbar .nav-links li a:hover {
+    background-color: #009bb0;
+}
+
+/* Tiles */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    gap: 60px;
+    padding: 20px;
+}
+
+.tile {
+    background-color: white;
+    padding: 20px;
+    text-decoration: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    text-align: center;
+    height: 210px;   /* Fixed height */
+    width: 80%;     /* Width auto-adjusts */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 120px;
+}
+
+.tile img {
+    max-width: 100%;
+    max-height: 70%;
+    object-fit: contain;  /* Ensures the image scales without being cut */
+    margin: auto;         /* Center the image */
+    flex-grow: 1;         /* Allows the image to grow to take available space */
+}
+
+.tile h2 {
+    margin-top: 10px;
+    font-size: 2rem;
+
+    color: #34495e;
+    flex-shrink: 0;  /* Prevent the h2 from shrinking */
+}
+
+.tile:hover {
+    transform: translateY(-10px);
+}
+
+.tile p {
+    color: #7f8c8d;
+}
+
+/* Notification badge */
+.notification-badge {
+    background-color: red;
+    color: white;
+    border-radius: 50%;
+    padding: 5px 10px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+}
+
+/* Footer */
+.footer {
+  background-color: #00BDD6;
+  color: white;
+  text-align: center;
+  padding: 0; /* Remove padding to minimize height */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  transition: left 0.3s, width 0.3s;
+  height: 25px; /* Reduce height */
+  display: flex;
+  align-items: center; /* Vertically center text */
+  justify-content: center; /* Horizontally center text */
+}
+
+.footer.shifted {
+  left: 250px;
+  width: calc(100% - 250px);
+}
+
+.alert {
+    padding: 15px;
+    margin: 20px 0;
+    background-color: #f44336;
+    color: white;
+    display: none;
+}
+
+/* Welcome h2 */
+h2 {
+    font-size: 1rem;
+    color: rgb(24, 2, 80);
+    line-height: 1.6;
+    margin: 0px;
+    padding: 0 20px;
+    width: 100%; /* Make it span the full width */
+}
+
+/* Styling for the Dashboard/Analytics image */
+/* Styling for the Dashboard/Analytics image */
+.dashboard-image {
+    width: 100vw; /* Full width of the viewport */
+    height: 225px; /* Fixed height */
+    margin: 0px; /* Optional margin */
+    overflow: hidden; /* Ensures no overflow */
+}
+
+.dashboard-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures the whole image fits without being cut */
+    background-color: #f0f0f0; /* Optional: Adds a background color for empty spaces */
+}
+
+h2>span{
+    font-size: 3rem;
+}
+
+.tagline {
+    font-size: 0.9rem; /* Smaller font size than h3 */
+    color: #34495e; /* Color of your choice */
+    margin: 0; /* Remove default margins */
+    padding-top: 5px; /* Optional: Add some space above the tagline */
+    text-align: center; /* Center align the slogan for a neat look */
+}
+
+h3>span{
+    font-size: 10px;
+    text-align: center;
+    color: rgb(24, 2, 80);
+}
+
+
+
+</style>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="logo">
+                <img src="Excel2.jpg" alt="Logo">
+                <h3>Excel Dashboard<br></h3>
+            </div>
+            <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+                <button class="logout-button" type="submit" style="background-color: red; margin-top: 0px;">Logout</button>
+            </form>
+        </nav>
+    </header>
+    
+
+    <main>
+  
+            
+      
+        <div class="tiles">
+            <a href="/upload" style="text-decoration: none;">
+                <div class="tile" >
+                    <img src="upload.png" alt="Quickbooks Login">
+                    <h2>Upload</h2>
+                </div>
+            </a>
+            <a href="/amending" style="text-decoration: none;">
+                <div class="tile">
+                    <img src="amend.png" alt="Xero Login">
+                    <h2>Amend Current Month</h2>
+                </div>
+            </a>
+            <a href="excompany.html" style="text-decoration: none;">
+                <div class="tile">
+                    <img src="bar-graph.png" alt="Excel Login">
+                    <h2>Dashboard</h2>
+                </div>
+            </a>
+        </div>
+        <div id="footer-placeholder"></div>
+        
+        <script>
+
+            // Function to get query parameters
+            function getQueryParam(param) {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get(param);
+            }
+
+            // Check if the message parameter is in the URL
+            const message = getQueryParam('message');
+            if (message) {
+                // Show the message if it's present
+                const messageBox = document.getElementById('message-box');
+                messageBox.textContent = message;
+                messageBox.style.display = 'block';
+
+                // Auto-hide the message after 3 seconds
+                setTimeout(() => {
+                    messageBox.style.display = 'none';
+                }, 3000); // 3 seconds
+            }
+        </script>
+    </main>
+</body>
+
+</html>

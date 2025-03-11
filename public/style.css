@@ -1,0 +1,301 @@
+/* styles.css */
+/* Style for the sidebar */
+
+.no-style-link {
+  text-decoration: none; /* Removes the underline */
+  color: inherit; /* Inherits the color from the parent element */
+}
+
+.no-style-link:hover,
+.no-style-link:focus {
+  text-decoration: none; /* Ensures the underline is not added on hover or focus */
+  color: inherit; /* Prevents color change on hover or focus */
+}
+
+/* Navbar styles with horizontal content */
+.navbar {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 60px; /* Adjust the height of your navbar */
+background: #FFFFFFFF;
+border-radius: 0px;
+box-shadow: 0px 0px 1.5px #171a1f, 0px 0px 2px #171a1f;
+
+color: white;
+z-index: 1000;
+display: flex;
+justify-content: space-between; /* Spread items horizontally */
+align-items: center;
+padding: 0 20px;
+box-sizing: border-box;
+}
+
+/* Logo */
+.logo-container {
+  height: 100%; /* Take the full height of the navbar */
+}
+
+.logo {
+  max-height: 100%; /* Ensure the logo fits within the navbar */
+  width: auto; /* Maintain aspect ratio */
+}
+
+/* Styling for navbar links (if applicable) */
+.navbar ul {
+list-style: none;
+display: flex;
+margin: 0;
+padding: 0;
+}
+
+.navbar ul li {
+margin-right: 20px; /* Space between items */
+font-family: Epilogue;
+}
+
+.navbar ul li a {
+font-family: Epilogue;
+font-size: 20px;
+line-height: 22px;
+font-weight: 700;
+color: #00BDD6FF;
+text-decoration: none;
+
+}
+
+.navbar ul li a:hover {
+text-decoration: underline;
+}
+
+/* Sidebar styling */
+.sidebar {
+top: 60px; /* Adjust to the navbar's height */
+height: calc(100vh - 60px); /* Full height minus the navbar height */
+position: fixed;
+left: 0;
+width: 200px;
+background: #F3F4F6FF;
+color: white;
+padding: 0; /* Remove padding to ensure the buttons fill the space */
+box-sizing: border-box;
+}
+
+.sidebar .button-container {
+padding-top: 40px; /* Adjust this value to create space from the top */
+}
+
+.button {
+width: 100%; /* Fills the sidebar's width */
+height: 50px; /* You can adjust the height as needed */
+padding: 10px;
+display: flex;
+align-items: center;
+justify-content: center;
+font-family: Inter, sans-serif;
+font-size: 16px;
+line-height: 22px;
+font-weight: 600;
+color: #FFFFFF;
+background: #00BDD6;
+border: none;
+border-radius: 0; /* Removes corner radius for a cleaner look */
+cursor: pointer;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.button:hover {
+background: #00A9C0;
+transform: translateY(-3px);
+}
+
+.button:active {
+background: #0095A9;
+transform: translateY(0);
+}
+
+.button:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+}
+
+/* Main content styling */
+.main-content {
+margin-top: 60px; /* Push content below the navbar */
+margin-left: 220px; /* Adjust based on sidebar width */
+padding: 20px;
+box-sizing: border-box;
+}
+
+.totals-container {
+display: flex;
+justify-content: space-around;
+margin-bottom: 20px;
+}
+
+.date-card {
+border: 1px solid #ccc;
+border-radius: 8px;
+padding: 16px;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+background-color: #f9f9f9;
+text-align: center;
+flex: 1;
+margin: 0 10px;
+}
+
+.card-content p {
+margin: 0;
+font-size: 18px;
+color: #333;
+font-weight: bold;
+}
+
+.chart-container {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 20px; /* Space between the charts */
+padding: 20px;
+}
+
+.chart-item {
+margin-bottom: 20px;
+}
+
+/* General button styling for the filter container */
+.filter-container button {
+  padding: 10px 15px;
+  margin: 0 5px 5px 0;
+  border: none; /* Light border color */
+  background-color: #00BDD6FF; /* Light background color */
+  color: #dedede; /* Text color */
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Active button state */
+.filter-container button.selected {
+  background-color: #063554FF; /* Background color when selected */
+  color: #dedede; /* Text color when selected */
+  border-color: #00A9C0; /* Border color when selected */
+}
+
+/* Hover effect */
+.filter-container button:hover {
+  background-color: #e0e0e0; /* Background color on hover */
+}
+
+/* Disabled button styling */
+.filter-container button:disabled {
+  background-color: #ddd; /* Background color for disabled state */
+  color: #aaa; /* Text color for disabled state */
+  border-color: #ccc; /* Border color for disabled state */
+  cursor: not-allowed;
+}
+
+/* Chart grid container */
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%; /* Ensure the container takes up full width */
+}
+
+/* Individual chart item styling */
+.chart-item {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  text-align: center;
+}
+
+/* Canvas elements styling */
+canvas {
+  width: 100%; /* Adjust the width to make it responsive */
+  max-width: 600px; /* Set a maximum width for consistency */
+  height: 400px; /* Set a fixed height */
+}
+
+/* Heading styles */
+h1, h2 {
+  text-align: center;
+  color: #444;
+}
+
+.logout-button, .navbar .nav-links li {
+  margin-left: 20px;
+  margin-bottom: 20px;
+}
+
+.logout-button, .navbar .nav-links li a {
+  text-decoration: none;
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 10px 20px;
+  background-color: #00BDD6;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+  border: none;
+}
+
+.logout-button:hover, .navbar .nav-links li a:hover {
+  background-color: #009bb0;
+}
+
+
+
+
+
+
+
+/* Flex container for tiles */
+.tile-container {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap; /* Allows wrapping of tiles if screen is too small */
+}
+
+/* Tile styling */
+.tile {
+  background-color: #e0e0e0;
+  padding: 20px;
+  width: 200px;
+  border-radius: 5px; /* Soft corners for the tile */
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+/* Tile hover effect */
+.tile:hover {
+  background-color: #d0d0d0;
+}
+
+/* Tile title */
+.tile h3 {
+  margin-top: 0;
+  font-size: 1.4em;
+  color: #333;
+}
+
+/* Button styling inside tiles */
+.btn {
+  display: inline-block;
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: #007BFF;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+}
+
+.btn:hover {
+  background-color: #0056b3;
+}

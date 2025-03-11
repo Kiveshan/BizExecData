@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <!-- Google Fonts and Material Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            height: 100%;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #00BDD6;
+            padding-top: 20px;
+            color: white;
+            transition: width 0.3s;
+        }
+
+        .sidebar a {
+            padding: 15px 20px;
+            text-decoration: none;
+            font-size: 18px;
+            color: white;
+            display: block;
+        }
+
+        .sidebar a:hover {
+            background-color: #2980b9;
+        }
+
+        /* Hide sidebar */
+        .sidebar.hidden {
+            width: 0;
+            overflow: hidden;
+        }
+
+        /* Content */
+        .content {
+            margin-left: 0; /* Initially without sidebar */
+            padding: 20px;
+            background-color: #ecf0f1;
+            flex-grow: 1;
+            transition: margin-left 0.3s;
+        }
+
+        .content.shifted {
+            margin-left: 250px; /* Adjust when sidebar is shown */
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #00BDD6;
+            padding: 20px;
+            color: white;
+            position: relative;
+        }
+
+        /* Logo Container */
+        .header .logo {
+            display: flex;
+            align-items: center; /* Align the logo and h3 vertically */
+        }
+
+        /* Logo Image */
+        .header .logo img {
+            height: 50px; /* Adjust the logo size */
+            margin-right: 10px; /* Space between the logo and text */
+        }
+
+        /* Logo Text */
+        .header .logo h3 {
+            font-size: 18px;
+            font-weight: bold;
+            color: white; /* Set text color to white for better contrast */
+            margin: 0; /* Remove default margin */
+        }
+
+        /* Title */
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        /* Logout button */
+        .logout-button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 20px; /* Adjust margin to keep space from the title */
+        }
+
+        .logout-button:hover {
+            background-color: #c0392b;
+        }
+
+        /* Tiles */
+        .tiles {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .tile {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            text-align: center;
+        }
+
+        .tile:hover {
+            transform: translateY(-10px);
+        }
+
+        .tile img {
+            max-width: 100%;
+            border-radius: 10px 10px 0 0;
+            height: auto;
+        }
+
+        .tile h2 {
+            margin-top: 10px;
+            font-size: 1.5rem;
+            color: #34495e;
+        }
+
+        .tile p {
+            color: #7f8c8d;
+        }
+
+        /* Notification badge */
+        .notification-badge {
+            background-color: red;
+            color: white;
+            border-radius: 50%;
+            padding: 5px 10px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 12px;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #00BDD6;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            position: fixed;
+            bottom: 0;
+            left: 0; /* Initially without sidebar */
+            width: 100%; /* Adjust width without sidebar */
+            transition: left 0.3s, width 0.3s;
+        }
+
+        .footer.shifted {
+            left: 250px; /* Adjust when sidebar is shown */
+            width: calc(100% - 250px); /* Adjust width when sidebar is shown */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">
+            <img src="logo_biz.png" alt="Navbar Logo">
+            <h3>Business Executive Data</h3>
+        </div>
+        <h1>Admin Menu options</h1>
+        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+            <button class="logout-button" type="submit">Logout</button>
+        </form>
+    </div>
+
+    <div class="tiles">
+        <a href="companyregapplications">
+            <div class="tile">
+                <img src="/company_approval.jpg" alt="Company Approval">
+                <h2>Company Approval</h2>
+                <span class="notification-badge">2</span>
+            </div>
+        </a>
+        <a href="licensemgt">
+        <div class="tile">
+            <img src="/license_agreement.jpg" alt="License Management">
+            <h2>License Management</h2>
+        </div>
+    </a>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            const footer = document.getElementById('footer');
+            
+            sidebar.classList.toggle('hidden');
+            content.classList.toggle('shifted');
+            footer.classList.toggle('shifted');
+        }
+    </script>
+
+</body>
+</html>

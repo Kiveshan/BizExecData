@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Registration Approvals</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #00BDD6;
+            padding: 10px 20px;
+            color: white;
+        }
+
+        /* Back button styling */
+        .back-button {
+            background-color: green;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .back-button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Logout button styling */
+        .logout-button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .logout-button:hover {
+            background-color: #c0392b;
+        }
+
+        /* Content */
+        .content {
+            padding: 20px;
+            background-color: #ecf0f1;
+            flex-grow: 1;
+        }
+
+        /* Tabs */
+        .tabs {
+    display: flex;
+    justify-content: space-around; /* Distributes the tabs evenly with equal space around */
+    margin-bottom: 20px;
+}
+
+.tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: #00BDD6;
+    color: white;
+    border-radius: 5px;
+    text-align: center;
+    flex-grow: 1; /* Make each tab take up equal width */
+    margin: 0 10px; /* Adds some margin between the tabs */
+}
+
+.tab.active {
+    background-color: #2980b9;
+}
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th, table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        table th {
+            background-color: #00BDD6;
+            color: white;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        table tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Action button */
+        .action-button {
+            background-color: #00BDD6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .action-button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Ensure link inside button is styled */
+        .action-button a {
+            color: white;
+            text-decoration: none;
+            display: block;
+        }
+
+        .action-button a:hover {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="/adminmenu" class="back-button">Back</a>
+        <h1>Company Registrations</h1>
+        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+            <button class="logout-button" type="submit">Logout</button>
+        </form>
+    </div>
+
+    <div class="content">
+
+        <div class="tabs">
+            <div class="tab" data-filter="quickbooks">QuickBooks</div>
+            <div class="tab" data-filter="xero">Xero</div>
+            <div class="tab" data-filter="excel">Excel</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Company Name</th>
+                    <th>Date Submitted</th>
+                    <th>Software</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <% applications.forEach(application => { %>
+                <tr class="<%= application.accounting_software.toLowerCase() %>">
+                    <td><%= application.userid %></td>
+                    <td><%= application.company_name %></td>
+                    <td><%= new Date(application.created_at).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
+                    <td><%= application.accounting_software %></td>
+                    <td><%= application.status %></td>
+                    <td><button class="action-button"><a href="/companyregdetails/<%= application.userid %>">View</a></button></td>
+                </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Get all tab elements and add click event listeners
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove 'active' class from all tabs and add to clicked tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Get the filter value from the clicked tab
+                const filter = tab.getAttribute('data-filter');
+
+                // Get all table rows
+                const rows = document.querySelectorAll('tbody tr');
+
+                // Show/Hide rows based on the filter
+                rows.forEach(row => {
+                    if (row.classList.contains(filter)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
