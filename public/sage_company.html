@@ -151,7 +151,7 @@
 <body>
   <div id="navbar"></div>
   <script>
-    fetch('quickbooks_navabar.html')
+    fetch('sage_navbar.html')
       .then(response => response.text())
       .then(data => {
         document.getElementById('navbar').innerHTML = data;
@@ -160,7 +160,7 @@
 
   <div id="sidebar"></div>
   <script>
-        fetch('sidebar.html')
+        fetch('sage_sidebar.html')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('sidebar').innerHTML = data;
@@ -173,7 +173,7 @@
             buttons.forEach(button => {
                 const buttonUrl = button.onclick.toString().match(/'(.*?)'/)?.[1];
                 if (buttonUrl === url) {
-                    button.style.backgroundColor = '#4a90e2';
+                    button.style.backgroundColor = 'green';
                 }
             });
         }
@@ -396,8 +396,8 @@
 
        function fetchDefaultMonthYear() {
          Promise.all([
-           fetch('/api/company').then(response => response.json()),
-           fetch('/api/profit').then(response => response.json())
+           fetch('/api/sagecompany').then(response => response.json()),
+           fetch('/api/sageprofit').then(response => response.json())
          ])
          .then(([companyData, profitDataResponse]) => {
            grossData = companyData.data;
@@ -496,7 +496,7 @@
        }
 
        function fetchLast6MonthsData() {
-         fetch('/api/company')
+         fetch('/api/sagecompany')
            .then(response => response.json())
            .then(data => {
              grossData = data.data;
@@ -504,7 +504,7 @@
              updateFinancialChart(last6MonthsGrossData);
            });
 
-         fetch('/api/profit')
+         fetch('/api/sageprofit')
            .then(response => response.json())
            .then(data => {
              profitData = data;
@@ -515,7 +515,7 @@
        }
 
        function fetchLast3MonthsData() {
-         fetch('/api/company')
+         fetch('/api/sagecompany')
            .then(response => response.json())
            .then(data => {
              grossData = data.data;
@@ -523,7 +523,7 @@
              updateFinancialChart(last3MonthsGrossData);
            });
 
-         fetch('/api/profit')
+         fetch('/api/sageprofit')
            .then(response => response.json())
            .then(data => {
              profitData = data;
