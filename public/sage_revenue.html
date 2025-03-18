@@ -150,7 +150,7 @@
 <body>
     <div id="navbar"></div>
     <script>
-        fetch('quickbooks_navabar.html')
+        fetch('sage_navbar.html')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('navbar').innerHTML = data;
@@ -159,7 +159,7 @@
 
     <div id="sidebar"></div>
     <script>
-        fetch('sidebar.html')
+        fetch('sage_sidebar.html')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('sidebar').innerHTML = data;
@@ -172,7 +172,7 @@
             buttons.forEach(button => {
                 const buttonUrl = button.onclick.toString().match(/'(.*?)'/)?.[1];
                 if (buttonUrl === url) {
-                    button.style.backgroundColor = '#4a90e2';
+                    button.style.backgroundColor = 'green';
                 }
             });
         }
@@ -374,9 +374,9 @@
 
             function fetchDefaultMonthYear() {
                 Promise.all([
-                    fetch('/api/revenue').then(response => response.json()),
-                    fetch('/api/company').then(response => response.json()),
-                    fetch('/api/costofsales').then(response => response.json())
+                    fetch('/api/sagerevenue').then(response => response.json()),
+                    fetch('/api/sagecompany').then(response => response.json()),
+                    fetch('/api/sagecostofsales').then(response => response.json())
                 ])
                 .then(([revenueData, companyData, costOfSalesData]) => {
                     salesData = revenueData;

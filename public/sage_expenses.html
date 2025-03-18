@@ -151,7 +151,7 @@
   <div id="navbar"></div>
   <script>
     // Load navbar.html into the div with id "navbar"
-    fetch('quickbooks_navabar.html')
+    fetch('sage_navbar.html')
       .then(response => response.text())
       .then(data => {
         document.getElementById('navbar').innerHTML = data;
@@ -161,7 +161,7 @@
   <div id="sidebar"></div>
   <script>
     // Load sidebar.html into the div with id "sidebar"
-    fetch('sidebar.html')
+    fetch('sage_sidebar.html')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('sidebar').innerHTML = data;
@@ -174,7 +174,7 @@
             buttons.forEach(button => {
                 const buttonUrl = button.onclick.toString().match(/'(.*?)'/)?.[1];
                 if (buttonUrl === url) {
-                    button.style.backgroundColor = '#4a90e2';
+                    button.style.backgroundColor = "green" ;
                 }
             });
         }
@@ -359,10 +359,15 @@
 
     function aggregateExpensesData(data) {
       const aggregated = {};
+
+  
       
       data.forEach(row => {
         const category = row.category;
-        const amount = parseFloat(row.expenses.replace(/R|\s/g, '').replace(',', '.'));
+        const amount = parseFloat(row.amount.replace(/R|\s/g, '').replace(',', '.'));
+
+        
+        console.log(amount)
 
         if (!aggregated[category]) {
           aggregated[category] = 0;
@@ -378,12 +383,13 @@
 
     function fetchDefaultMonthYear() {
       Promise.all([
-        fetch('/api/profit').then(response => response.json()),
-        fetch('/api/expenses').then(response => response.json())
+        fetch('/api/sageprofit').then(response => response.json()),
+        fetch('/api/sageexpenses').then(response => response.json())
       ])
       .then(([profitDataResponse, expensesDataResponse]) => {
         profitData = profitDataResponse;
         expensesData = expensesDataResponse.data;
+        console.log(expensesData)
         const lastEntryDate = expensesDataResponse.lastEntryDate;
         const month = formatMonth(lastEntryDate);
         const year = formatYear(lastEntryDate);
