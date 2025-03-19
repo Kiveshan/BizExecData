@@ -2586,6 +2586,12 @@ const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "REDACTED";
 
 import fetch from 'node-fetch';
+import { v4 as uuidv4 } from 'uuid';
+
+
+// In-memory storage for progress tracking
+// In a production environment, consider using Redis or another shared storage
+const progressTracker = {};
 
 
 
@@ -2684,6 +2690,30 @@ async function makeApiCall(endpoint, username, password, queryParams = {}) {
   }
 }
 
+// Add this route to your Express app
+app.post('/check-user-exists', async (req, res) => {
+  let db;
+  
+  try {
+    db = await connectDb();
+    const { email } = req.body;
+    
+    // Check if user exists in database
+    const result = await db.query("SELECT * FROM user_table WHERE email = $1", [email]);
+    
+    // Return whether the user exists or not
+    res.json({ exists: result.rows.length > 0 });
+  } catch (err) {
+    console.error("Error checking if user exists:", err);
+    // In case of error, assume user doesn't exist to trigger normal login flow
+    res.json({ exists: false, error: err.message });
+  } finally {
+    if (db) {
+      await closeDb(db);
+    }
+  }
+});
+
 // Function to get company data with dynamic credentials
 async function getCompanyData(username, password) {
   try {
@@ -2729,7 +2759,7 @@ app.post("/sagelogin", async (req, res) => {
   
   try {
     db = await connectDb();
-    const { email, password } = req.body;
+    const { email, password, confirmed } = req.body;
     console.log("Login/Registration attempt for:", email);
 
     // Check if user exists in database
@@ -2767,7 +2797,7 @@ app.post("/sagelogin", async (req, res) => {
         };
 
         if (result.rows[0].first_time_insertion == false) {
-          return res.redirect("/getProfitandLoss");
+          return res.redirect("/extract-profit-loss"); // Redirect to the new loading page
         }
 
         console.log("User logged in successfully");
@@ -2783,13 +2813,26 @@ app.post("/sagelogin", async (req, res) => {
 
     // User doesn't exist - handle registration
     console.log("User not found, starting registration process");
+    
+    // Check if registration was confirmed
+    if (confirmed !== 'true') {
+      // If not confirmed, render the login page again
+      // The JavaScript will show the confirmation modal
+      return res.render("sagelogin", {
+        error: "Please confirm registration to continue",
+        email: email,
+      });
+    }
 
-    // Validate Sage credentials using the dedicated endpoint
+    // Registration was confirmed, proceed with the process
+    console.log("Registration confirmed, proceeding with Sage validation");
+
+    // Validate Sage credentials using the improved validation function
     const validationResult = await validateSageCredentials(email, password);
     
     if (!validationResult.isValid) {
       return res.render("sagelogin", {
-        error: "Invalid Sage credentials. Please check your email and password.",
+        error: validationResult.error || "Invalid Sage credentials. Please check your email and password.",
         email: email,
       });
     }
@@ -2857,7 +2900,7 @@ app.post("/sagelogin", async (req, res) => {
 
     // Render dashboard with new user data
     return res.render("sagelogin", {
-      error: "Thank you for registering with BizExecData please wait for our admin to approve you"
+      error: "Thank you for registering with BizExecData. Please wait for our admin to approve you"
     });
   } catch (err) {
     console.error("Error during login/registration:", err);
@@ -2984,30 +3027,110 @@ async function getProfitAndLossForSpecificMonth(companyId, fromDate, toDate, use
   }
 }
 
-// Modified version of your existing route handler to use dynamic credentials
-app.get("/getProfitandLoss", async (req, res) => {
-  const db = await connectDb()
+// Add this route to render the loading page
+app.get('/extract-profit-loss', (req, res) => {
+  // Check if user is logged in
+  if (!req.session.user) {
+    return res.redirect('/sagelogin');
+  }
+  
+  // Render the loading page
+  res.render('profit-loss-loading');
+});
+
+// Start the profit and loss process and return a progress ID
+app.post('/start-profit-loss-process', async (req, res) => {
   try {
+    // Check if user is logged in
+    if (!req.session.user) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated' 
+      });
+    }
+    
     const companyid = req.session.user.companyid;
     const userid = req.session.user.userid;
     const email = req.session.user.email;
     const password = req.session.user.password;
     
-    console.log("Company ID:", companyid);
-    
     // Generate date ranges for each month from Jan 2024 to now
-    const dateRanges = generateMonthlyDateRanges(2024, 0); // Start from January (month 0) 2024
+    const dateRanges = generateMonthlyDateRanges(2024, 0);
     
-    console.log(`Processing profit and loss data for ${dateRanges.length} months...`);
+    // Create a unique progress ID
+    const progressId = uuidv4();
     
-    // Process each month sequentially to avoid overwhelming the API
-    const results = [];
+    // Initialize progress tracking
+    progressTracker[progressId] = {
+      total: dateRanges.length,
+      processed: 0,
+      complete: false,
+      messages: [
+        { message: 'Starting data extraction process...', type: 'info' }
+      ],
+      lastCheckedIndex: 0
+    };
     
-    for (const range of dateRanges) {
+    // Start the processing in the background
+    processMonthlyData(progressId, dateRanges, companyid, userid, email, password);
+    
+    // Return the progress ID to the client
+    res.json({
+      success: true,
+      progressId: progressId,
+      totalMonths: dateRanges.length
+    });
+  } catch (error) {
+    console.error("Error starting profit and loss process:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to start profit and loss process: " + error.message
+    });
+  }
+});
+
+// Check the progress of a specific process
+app.get('/check-progress/:progressId', (req, res) => {
+  const progressId = req.params.progressId;
+  const progress = progressTracker[progressId];
+  
+  if (!progress) {
+    return res.status(404).json({
+      success: false,
+      error: 'Progress ID not found'
+    });
+  }
+  
+  // Get new messages since last check
+  const newMessages = progress.messages.slice(progress.lastCheckedIndex);
+  progress.lastCheckedIndex = progress.messages.length;
+  
+  res.json({
+    success: true,
+    total: progress.total,
+    processed: progress.processed,
+    complete: progress.complete,
+    newMessages: newMessages
+  });
+});
+
+// Process monthly data in the background
+async function processMonthlyData(progressId, dateRanges, companyid, userid, email, password) {
+  const progress = progressTracker[progressId];
+  
+  try {
+    // Process each month sequentially
+    for (let i = 0; i < dateRanges.length; i++) {
+      const range = dateRanges[i];
+      
       try {
-        console.log(`Processing ${range.monthName} ${range.year}...`);
+        // Add processing message
+        progress.messages.push({
+          message: `Processing ${range.monthName} ${range.year}...`,
+          type: 'info'
+        });
         
-        // Get profit and loss data for this month using dynamic credentials
+        // Get profit and loss data for this month
         const profitAndLossData = await getProfitAndLossForSpecificMonth(
           companyid, 
           range.startDate, 
@@ -3019,28 +3142,26 @@ app.get("/getProfitandLoss", async (req, res) => {
         // Use the last day of the month as the date for the database records
         const recordDate = new Date(range.endDate);
         
-        // Process and store the data using your existing functions
+        // Process and store the data
         await getSageRevenue(profitAndLossData, userid, recordDate);
         await insertSageExpenses(profitAndLossData, userid, recordDate);
         await insertSageCostOfSales(profitAndLossData, userid, recordDate);
         await insertSageTotals(profitAndLossData, userid, recordDate);
         
-        results.push({
-          period: `${range.monthName} ${range.year}`,
-          startDate: range.startDate,
-          endDate: range.endDate,
-          status: "Processed successfully"
+        // Update progress
+        progress.processed++;
+        progress.messages.push({
+          message: `Successfully processed ${range.monthName} ${range.year}`,
+          type: 'success'
         });
-        
-        console.log(`Successfully processed ${range.monthName} ${range.year}`);
       } catch (error) {
         console.error(`Failed to process ${range.monthName} ${range.year}:`, error);
-        // Continue with the next month even if this one failed
-        results.push({
-          period: `${range.monthName} ${range.year}`,
-          startDate: range.startDate,
-          endDate: range.endDate,
-          error: error.message
+        
+        // Add error message but continue processing
+        progress.processed++;
+        progress.messages.push({
+          message: `Failed to process ${range.monthName} ${range.year}: ${error.message}`,
+          type: 'error'
         });
       }
       
@@ -3048,23 +3169,48 @@ app.get("/getProfitandLoss", async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.log(`Completed processing ${results.length} months of profit and loss data`);
-    await db.query("UPDATE user_table SET first_time_insertion = true WHERE userid = $1", [userid]);
-
-
-    res.redirect("/sagecompany")
+    // Update the first_time_insertion flag
+    const db = await connectDb();
+    try {
+      await db.query("UPDATE user_table SET first_time_insertion = true WHERE userid = $1", [userid]);
+    } finally {
+      await closeDb(db);
+    }
     
-
-  } catch (error) {
-    console.error("Error in getProfitandLoss route:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to process profit and loss data",
-      details: error.message
+    // Mark as complete
+    progress.complete = true;
+    progress.messages.push({
+      message: `Completed processing ${dateRanges.length} months of profit and loss data`,
+      type: 'success'
     });
-  } finally{
-   await closeDb(db)
+    
+    // Clean up progress tracker after 10 minutes
+    setTimeout(() => {
+      delete progressTracker[progressId];
+    }, 10 * 60 * 1000);
+  } catch (error) {
+    console.error("Error in processMonthlyData:", error);
+    
+    // Add error message
+    progress.messages.push({
+      message: `Error processing data: ${error.message}`,
+      type: 'error'
+    });
+    
+    // Mark as complete with error
+    progress.complete = true;
   }
+}
+
+// Modified version of your existing route handler to redirect to the loading page
+app.get("/getProfitandLoss", async (req, res) => {
+  // Check if user is logged in
+  if (!req.session.user) {
+    return res.redirect('/sagelogin');
+  }
+  
+  // Redirect to the loading page
+  res.redirect('/extract-profit-loss');
 });
 
 // Modified getSageRevenue function to accept a custom date
@@ -3084,18 +3230,30 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
       amount: item.Total[0]
     }));
     
-    // Insert each revenue item into the database
-    await Promise.all(salesExtracted.map(async (revenue) => {
-      await db.query(`
-        INSERT INTO sage_revenue (
-          userid, category, revenue, date
-        ) VALUES (
-          $1, $2, $3, $4
-        )
-      `, [userid, revenue.name, revenue.amount, date]);
-    }));
+    // For each revenue item, check if it exists and update or insert accordingly
+    for (const revenue of salesExtracted) {
+      // Check if record exists
+      const existingRecord = await db.query(
+        `SELECT * FROM sage_revenue WHERE userid = $1 AND category = $2 AND date = $3`,
+        [userid, revenue.name, date]
+      );
+      
+      if (existingRecord.rows.length > 0) {
+        // Update existing record
+        await db.query(
+          `UPDATE sage_revenue SET revenue = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
+          [revenue.amount, userid, revenue.name, date]
+        );
+      } else {
+        // Insert new record
+        await db.query(
+          `INSERT INTO sage_revenue (userid, category, revenue, date) VALUES ($1, $2, $3, $4)`,
+          [userid, revenue.name, revenue.amount, date]
+        );
+      }
+    }
     
-    console.log(`Inserted ${salesExtracted.length} revenue records for user ${userid} for date ${formatDate(date)}`);
+    console.log(`Upserted ${salesExtracted.length} revenue records for user ${userid} for date ${formatDate(date)}`);
     return salesExtracted;
   } catch (err) {
     console.error(`Error in getSageRevenue for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
@@ -3107,7 +3265,7 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
   }
 }
 
-// Modified insertSageExpenses function to accept a custom date
+// Modified insertSageExpenses function to use manual upsert without schema changes
 async function insertSageExpenses(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3124,18 +3282,30 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
       amount: item.Total[0],
     }));
     
-    // Insert each expense item into the database
-    await Promise.all(expensesExtracted.map(async (item) => {
-      await db.query(`
-        INSERT INTO sage_expenses (
-          userid, category, amount, date
-        ) VALUES (
-          $1, $2, $3, $4
-        )
-      `, [userid, item.name, item.amount, formattedDate]);
-    }));
+    // For each expense item, check if it exists and update or insert accordingly
+    for (const expense of expensesExtracted) {
+      // Check if record exists
+      const existingRecord = await db.query(
+        `SELECT * FROM sage_expenses WHERE userid = $1 AND category = $2 AND date = $3`,
+        [userid, expense.name, formattedDate]
+      );
+      
+      if (existingRecord.rows.length > 0) {
+        // Update existing record
+        await db.query(
+          `UPDATE sage_expenses SET amount = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
+          [expense.amount, userid, expense.name, formattedDate]
+        );
+      } else {
+        // Insert new record
+        await db.query(
+          `INSERT INTO sage_expenses (userid, category, amount, date) VALUES ($1, $2, $3, $4)`,
+          [userid, expense.name, expense.amount, formattedDate]
+        );
+      }
+    }
     
-    console.log(`Inserted ${expensesExtracted.length} expense records for user ${userid} for date ${formatDate(formattedDate)}`);
+    console.log(`Upserted ${expensesExtracted.length} expense records for user ${userid} for date ${formatDate(formattedDate)}`);
     return expensesExtracted;
   } catch (err) {
     console.error(`Error in insertSageExpenses for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
@@ -3147,7 +3317,7 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
   }
 }
 
-// Modified insertSageCostOfSales function to accept a custom date
+// Modified insertSageCostOfSales function to use manual upsert without schema changes
 async function insertSageCostOfSales(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3164,18 +3334,30 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
       amount: item.Total ? item.Total[0] : 0, // Handle case where Total might be missing
     }));
     
-    // Insert each cost of sales item into the database
-    await Promise.all(costOfSalesExtracted.map(async (item) => {
-      await db.query(`
-        INSERT INTO sage_costofsales (
-          userid, category, amount, date
-        ) VALUES (
-          $1, $2, $3, $4
-        )
-      `, [userid, item.name, item.amount, formattedDate]);
-    }));
+    // For each cost of sales item, check if it exists and update or insert accordingly
+    for (const item of costOfSalesExtracted) {
+      // Check if record exists
+      const existingRecord = await db.query(
+        `SELECT * FROM sage_costofsales WHERE userid = $1 AND category = $2 AND date = $3`,
+        [userid, item.name, formattedDate]
+      );
+      
+      if (existingRecord.rows.length > 0) {
+        // Update existing record
+        await db.query(
+          `UPDATE sage_costofsales SET amount = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
+          [item.amount, userid, item.name, formattedDate]
+        );
+      } else {
+        // Insert new record
+        await db.query(
+          `INSERT INTO sage_costofsales (userid, category, amount, date) VALUES ($1, $2, $3, $4)`,
+          [userid, item.name, item.amount, formattedDate]
+        );
+      }
+    }
     
-    console.log(`Inserted ${costOfSalesExtracted.length} cost of sales records for user ${userid} for date ${formatDate(formattedDate)}`);
+    console.log(`Upserted ${costOfSalesExtracted.length} cost of sales records for user ${userid} for date ${formatDate(formattedDate)}`);
     return costOfSalesExtracted;
   } catch (err) {
     console.error(`Error in insertSageCostOfSales for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
@@ -3187,7 +3369,7 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
   }
 }
 
-// Modified insertSageTotals function to accept a custom date
+// Modified insertSageTotals function to use manual upsert without schema changes
 async function insertSageTotals(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3211,16 +3393,35 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
     // Extract total expenses
     const totalExpenses = totals.find(item => item.Description === "Total for Expenses")?.Total?.[0] || 0;
     
-    // Insert a single row with all the totals
-    await db.query(`
-      INSERT INTO sage_company_calcs (
-        userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7
-      )
-    `, [userid, grossProfit, totalExpenses, netProfit, totalSales, totalCostOfSales, formattedDate]);
+    // Check if record exists for this user and date
+    const existingRecord = await db.query(
+      `SELECT * FROM sage_company_calcs WHERE userid = $1 AND date = $2`,
+      [userid, formattedDate]
+    );
     
-    console.log(`Inserted financial totals for user ${userid} for date ${formatDate(formattedDate)}`);
+    if (existingRecord.rows.length > 0) {
+      // Update existing record
+      await db.query(`
+        UPDATE sage_company_calcs SET 
+          grossprofit = $1, 
+          opexpenses = $2, 
+          netprofit = $3, 
+          sumofsales = $4, 
+          sumofcost = $5
+        WHERE userid = $6 AND date = $7
+      `, [grossProfit, totalExpenses, netProfit, totalSales, totalCostOfSales, userid, formattedDate]);
+    } else {
+      // Insert new record
+      await db.query(`
+        INSERT INTO sage_company_calcs (
+          userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7
+        )
+      `, [userid, grossProfit, totalExpenses, netProfit, totalSales, totalCostOfSales, formattedDate]);
+    }
+    
+    console.log(`Upserted financial totals for user ${userid} for date ${formatDate(formattedDate)}`);
     
     // Return the extracted totals for reference
     return {
