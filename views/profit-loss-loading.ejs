@@ -3,310 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processing Financial Data</title>
+    <title>Extracting Profit and Loss Data</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .navbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            background-color: white;
-            border-bottom: 1px solid #ccc;
-        }
-        
-        .navbar .logo {
-            display: flex;
-            align-items: center;
-        }
-        
-        .navbar .logo img {
-            height: 50px;
-            margin-right: 10px;
-        }
-        
-        .navbar .logo h3 {
-            font-size: 18px;
-            font-weight: bold;
-            color: #00BDD6;
-            margin: 0;
-        }
-        
-        .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .loading-card {
+        .loading-container {
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 30px;
             background-color: white;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            width: 100%;
-            max-width: 600px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-        
-        .loading-title {
-            color: #00BDD6;
-            font-size: 24px;
+        .spinner-border {
+            width: 4rem;
+            height: 4rem;
+            margin: 30px auto;
+            color: #0d6efd;
+        }
+        h1 {
+            color: #0d6efd;
+            font-size: 28px;
             margin-bottom: 20px;
         }
-        
-        .loading-subtitle {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 30px;
-        }
-        
-        .progress-container {
-            width: 100%;
-            background-color: #f1f1f1;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        
-        .progress-bar {
-            height: 20px;
-            background-color: #00BDD6;
-            border-radius: 5px;
-            width: 0%;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .status-container {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            max-height: 200px;
-            overflow-y: auto;
-            text-align: left;
-        }
-        
         .status-message {
-            margin: 5px 0;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
+            margin: 20px 0;
+            font-size: 18px;
+            color: #495057;
         }
-        
-        .status-message.success {
-            color: #28a745;
-        }
-        
-        .status-message.error {
-            color: #dc3545;
-        }
-        
-        .status-message.info {
-            color: #17a2b8;
-        }
-        
-        .loading-spinner {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #00BDD6;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 2s linear infinite;
-            margin: 0 auto 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            background-color: #00BDD6;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        
-        .btn:hover {
-            background-color: #009bb0;
-        }
-        
-        .btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
+        .company-logo {
+            max-width: 150px;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
-    <header>
-        <nav class="navbar">
-            <div class="logo">
-                <a href="/index">
-                    <img src="logo_biz.png" alt="Navbar Logo">
-                </a>
-                <h3>Business Executive Data</h3>
-            </div>
-        </nav>
-    </header>
-
     <div class="container">
-        <div class="loading-card">
-            <h1 class="loading-title">Processing Financial Data</h1>
-            <p class="loading-subtitle">Please wait while we extract and process your Sage financial data.</p>
+        <div class="loading-container">
+            <!-- Company logo could go here -->
+            <!-- <img src="/images/logo.png" alt="Company Logo" class="company-logo"> -->
             
-            <div class="loading-spinner" id="loadingSpinner"></div>
+            <h1>Extracting Your Financial Data</h1>
             
-            <div class="progress-container">
-                <div class="progress-bar" id="progressBar">0%</div>
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
             
-            <p id="currentOperation">Initializing...</p>
-            
-            <div class="status-container" id="statusContainer">
-                <div class="status-message info">Starting data extraction process...</div>
+            <div class="status-message">
+                <p>We're extracting your profit and loss data from Sage.</p>
+                <p>This may take a few minutes. Please don't close this window.</p>
             </div>
             
-            <button id="viewDashboardBtn" class="btn hidden">View Dashboard</button>
+            <div id="progress-info" class="alert alert-info" role="alert">
+                Starting data extraction...
+            </div>
         </div>
     </div>
 
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const progressBar = document.getElementById('progressBar');
-            const currentOperation = document.getElementById('currentOperation');
-            const statusContainer = document.getElementById('statusContainer');
-            const loadingSpinner = document.getElementById('loadingSpinner');
-            const viewDashboardBtn = document.getElementById('viewDashboardBtn');
+            // Start the extraction process when the page loads
+            startExtraction();
             
-            // Function to add a status message
-            function addStatusMessage(message, type = 'info') {
-                const messageElement = document.createElement('div');
-                messageElement.className = `status-message ${type}`;
-                messageElement.textContent = message;
-                statusContainer.appendChild(messageElement);
-                statusContainer.scrollTop = statusContainer.scrollHeight;
-            }
+            // Set up polling to check if extraction is complete
+            const checkInterval = setInterval(checkExtractionStatus, 3000);
             
-            // Function to update progress
-            function updateProgress(percent, operation) {
-                progressBar.style.width = `${percent}%`;
-                progressBar.textContent = `${percent}%`;
-                if (operation) {
-                    currentOperation.textContent = operation;
-                    addStatusMessage(operation);
-                }
-            }
-            
-            // Function to complete the loading process
-            function completeLoading(success = true, message = '') {
-                loadingSpinner.style.display = 'none';
-                viewDashboardBtn.classList.remove('hidden');
-                
-                if (success) {
-                    updateProgress(100, 'Processing complete!');
-                    addStatusMessage('All financial data has been successfully processed.', 'success');
-                } else {
-                    addStatusMessage(`Error: ${message}`, 'error');
-                    addStatusMessage('Processing completed with errors. Some data may be incomplete.', 'error');
-                }
-            }
-            
-            // Function to check progress
-            function checkProgress(progressId) {
-                fetch(`/check-progress/${progressId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            completeLoading(false, data.error);
-                            return;
+            // Function to start the extraction process
+            async function startExtraction() {
+                try {
+                    const response = await fetch('/start-profit-loss-process', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
                         }
-                        
-                        // Update progress bar
-                        const percent = Math.round((data.processed / data.total) * 100);
-                        updateProgress(percent, `Processed ${data.processed} of ${data.total} months`);
-                        
-                        // Add new status messages
-                        if (data.newMessages && data.newMessages.length > 0) {
-                            data.newMessages.forEach(msg => {
-                                addStatusMessage(msg.message, msg.type);
-                            });
-                        }
-                        
-                        // If not complete, check again in 2 seconds
-                        if (!data.complete) {
-                            setTimeout(() => checkProgress(progressId), 2000);
-                        } else {
-                            completeLoading(true);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking progress:', error);
-                        // If there's an error, try again in 3 seconds
-                        setTimeout(() => checkProgress(progressId), 3000);
                     });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        updateProgressInfo('Data extraction started. This may take several minutes...');
+                    } else {
+                        updateProgressInfo('Error starting extraction: ' + (data.error || 'Unknown error'), 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error starting extraction:', error);
+                    updateProgressInfo('Error connecting to server. Please refresh the page to try again.', 'danger');
+                }
             }
             
-            // Start the data extraction process
-            function startDataExtraction() {
-                addStatusMessage('Connecting to Sage API...');
-                updateProgress(5, 'Starting data extraction...');
-                
-                fetch('/start-profit-loss-process', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
+            // Function to check if extraction is complete
+            async function checkExtractionStatus() {
+                try {
+                    const response = await fetch('/check-extraction-complete');
+                    const data = await response.json();
+                    
                     if (data.error) {
-                        completeLoading(false, data.error);
+                        updateProgressInfo('Error checking status: ' + data.error, 'danger');
                         return;
                     }
                     
-                    addStatusMessage(`Found ${data.totalMonths} months of data to process`, 'info');
-                    
-                    // Start checking progress
-                    checkProgress(data.progressId);
-                })
-                .catch(error => {
-                    console.error('Error starting process:', error);
-                    completeLoading(false, 'Failed to start data extraction process');
-                });
+                    if (data.complete) {
+                        // Extraction is complete, redirect to dashboard
+                        clearInterval(checkInterval);
+                        updateProgressInfo('Data extraction complete! Redirecting to dashboard...', 'success');
+                        
+                        // Wait 2 seconds before redirecting for user to see the success message
+                        setTimeout(() => {
+                            window.location.href = '/sagecompany';
+                        }, 2000);
+                    } else {
+                        // Still processing, update the message
+                        updateProgressInfo('Still processing your data. Please wait...');
+                    }
+                } catch (error) {
+                    console.error('Error checking extraction status:', error);
+                    updateProgressInfo('Error connecting to server. Still trying...', 'warning');
+                }
             }
             
-            // Handle dashboard button click
-            viewDashboardBtn.addEventListener('click', function() {
-                window.location.href = '/sagecompany';
-            });
-            
-            // Start the process automatically when the page loads
-            setTimeout(startDataExtraction, 1000); // Small delay for better UX
+            // Function to update the progress info message
+            function updateProgressInfo(message, type = 'info') {
+                const progressInfo = document.getElementById('progress-info');
+                progressInfo.textContent = message;
+                
+                // Remove all alert classes
+                progressInfo.classList.remove('alert-info', 'alert-success', 'alert-warning', 'alert-danger');
+                
+                // Add the appropriate alert class
+                progressInfo.classList.add(`alert-${type}`);
+            }
         });
     </script>
 </body>

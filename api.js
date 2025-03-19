@@ -2591,11 +2591,26 @@ import { v4 as uuidv4 } from 'uuid';
 
 // In-memory storage for progress tracking
 // In a production environment, consider using Redis or another shared storage
-const progressTracker = {};
+const extractionStatus = {};
 
+/**
+ * Helper function to format a Date object as YYYY-MM-DD string
+ * Used for API requests and database operations that require date strings
+ * 
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted date string in YYYY-MM-DD format
+ *
 
-
-// Function to validate Sage credentials more thoroughly
+/**
+ * Validates Sage credentials by making API calls to Sage
+ * Performs a two-step validation:
+ * 1. Checks if the credentials are valid using Login/Validate endpoint
+ * 2. Verifies API access by attempting to fetch companies
+ * 
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @returns {Object} Result object with isValid flag and error message if applicable
+ */
 async function validateSageCredentials(username, password) {
   try {
     // Step 1: Validate credentials using Login/Validate endpoint
@@ -2603,6 +2618,7 @@ async function validateSageCredentials(username, password) {
     
     console.log(`Validating Sage credentials for user: ${username}`);
     
+    // Make POST request to validate credentials
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -2646,14 +2662,30 @@ async function validateSageCredentials(username, password) {
   }
 }
 
-// Function to get auth header for authenticated API calls
+/**
+ * Creates a Basic Authentication header for API requests
+ * Encodes username:password in Base64 format as per HTTP Basic Auth standard
+ * 
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @returns {string} Basic authentication header value
+ */
 const getAuthHeader = (username, password) => {
   return 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 };
 
-// Function to make authenticated API calls with dynamic credentials
+/**
+ * Makes an authenticated GET request to the Sage API
+ * Used for general API endpoints that don't require a request body
+ * 
+ * @param {string} endpoint - API endpoint path (e.g., 'Company/Get')
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @param {Object} queryParams - Additional query parameters for the request
+ * @returns {Object} JSON response from the API
+ */
 async function makeApiCall(endpoint, username, password, queryParams = {}) {
-  // Build query string from params
+  // Build query string from params, including the API key
   const queryString = Object.entries({
     apikey: apiKey,
     ...queryParams
@@ -2666,6 +2698,7 @@ async function makeApiCall(endpoint, username, password, queryParams = {}) {
   console.log(`Making request to: ${url}`);
   
   try {
+    // Make the authenticated GET request
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -2677,12 +2710,14 @@ async function makeApiCall(endpoint, username, password, queryParams = {}) {
 
     console.log(`${endpoint} Status:`, response.status);
 
+    // Handle error responses
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Error response:', errorText);
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
+    // Parse and return the JSON response
     return await response.json();
   } catch (error) {
     console.error(`Error calling ${endpoint}:`, error);
@@ -2690,7 +2725,10 @@ async function makeApiCall(endpoint, username, password, queryParams = {}) {
   }
 }
 
-// Add this route to your Express app
+/**
+ * API endpoint to check if a user exists in the database
+ * Used by the frontend to determine if a user should go through login or registration flow
+ */
 app.post('/check-user-exists', async (req, res) => {
   let db;
   
@@ -2708,23 +2746,32 @@ app.post('/check-user-exists', async (req, res) => {
     // In case of error, assume user doesn't exist to trigger normal login flow
     res.json({ exists: false, error: err.message });
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 });
 
-// Function to get company data with dynamic credentials
+/**
+ * Fetches company data from Sage API for a given user
+ * Used during registration to get company details and verify API access
+ * 
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @returns {Object} Company data and validation status
+ */
 async function getCompanyData(username, password) {
   try {
     // Get the list of companies
     console.log("Fetching companies...");
     const companiesData = await makeApiCall('Company/Get', username, password);
     
-    // Log the entire response structure
+    // Log the entire response structure for debugging
     console.log("\n=== FULL COMPANIES RESPONSE ===");
     console.log(JSON.stringify(companiesData, null, 2));
     
+    // Check if any companies were returned
     if (!companiesData.Results || companiesData.Results.length === 0) {
       console.log("No companies found!");
       return { isValid: true, noCompanies: true };
@@ -2733,6 +2780,7 @@ async function getCompanyData(username, password) {
     console.log(`\n=== FOUND ${companiesData.TotalResults} COMPANIES, SHOWING ${companiesData.ReturnedResults} ===`);
     
     // Use the first company for subsequent API calls
+    // In a more advanced implementation, you might let the user choose which company
     const selectedCompany = companiesData.Results[0];
     const companyId = selectedCompany.ID;
     
@@ -2750,10 +2798,18 @@ async function getCompanyData(username, password) {
   }
 }
 
+/**
+ * Route handler for the login page
+ * Renders the login form
+ */
 app.get("/sagelogin", (req, res) => {
   res.render("sagelogin");
 });
 
+/**
+ * Route handler for login form submission
+ * Handles both login and registration flows
+ */
 app.post("/sagelogin", async (req, res) => {
   let db;
   
@@ -2765,21 +2821,22 @@ app.post("/sagelogin", async (req, res) => {
     // Check if user exists in database
     const result = await db.query("SELECT * FROM user_table WHERE email = $1", [email]);
 
-    // If user exists - handle login
+    // If user exists - handle login flow
     if (result.rows.length > 0) {
       const user = result.rows[0];
 
-      // Verify password
+      // Verify password using bcrypt
       const passwordMatch = await compare(password, user.password);
 
       if (passwordMatch) {
-        // Set user session
+        // Check if account is pending approval
         if (result.rows[0].status == "pending") {
           return res.render("sagelogin", {
             error: "Your account is awaiting approval. Please wait for our admin to approve your account",
           });
         }
 
+        // Check if license is valid
         const sage_license = await db.query(`SELECT * FROM license_management WHERE userid = $1`, [result.rows[0].sage_company_id]);
         console.log(sage_license.rows[0]);
 
@@ -2789,6 +2846,7 @@ app.post("/sagelogin", async (req, res) => {
           });
         }
 
+        // Set user session with necessary data for API calls
         req.session.user = {
           userid: user.userid,
           companyid: user.sage_company_id,
@@ -2796,10 +2854,12 @@ app.post("/sagelogin", async (req, res) => {
           password: password // Store the plain password for API calls (consider encryption in production)
         };
 
+        // If first time login, redirect to data extraction page
         if (result.rows[0].first_time_insertion == false) {
           return res.redirect("/extract-profit-loss"); // Redirect to the new loading page
         }
 
+        // Otherwise, redirect to dashboard
         console.log("User logged in successfully");
         return res.redirect("/sagecompany");
       } else {
@@ -2811,10 +2871,11 @@ app.post("/sagelogin", async (req, res) => {
       }
     }
 
-    // User doesn't exist - handle registration
+    // User doesn't exist - handle registration flow
     console.log("User not found, starting registration process");
     
-    // Check if registration was confirmed
+    // Check if registration was confirmed by the user
+    // This is used with the confirmation modal in the frontend
     if (confirmed !== 'true') {
       // If not confirmed, render the login page again
       // The JavaScript will show the confirmation modal
@@ -2849,12 +2910,13 @@ app.post("/sagelogin", async (req, res) => {
       });
     }
 
-    // Hash the password for database storage
+    // Hash the password for secure database storage
     const saltRounds = 10;
     const hashedPassword = await hash(password, saltRounds);
     console.log(hashedPassword);
     console.log(companyData.companyData.ID);
 
+    // Combine company address fields
     const full_address = companyData.companyData.CompanyInfo01 + "," + companyData.companyData.CompanyInfo02 + "," + companyData.companyData.CompanyInfo03 + "," + companyData.companyData.CompanyInfo04 + "," + companyData.companyData.CompanyInfo05;
     console.log(full_address);
     
@@ -2879,6 +2941,7 @@ app.post("/sagelogin", async (req, res) => {
 
     const newUser = insertResult.rows[0];
     
+    // Create license record for the new user
     const newUserId = newUser.sage_company_id;
     const currentDate = new Date();
     await db.query(`
@@ -2909,13 +2972,25 @@ app.post("/sagelogin", async (req, res) => {
       email: req.body.email,
     });
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 });
 
-// Updated function to make authenticated API calls with dynamic credentials
+/**
+ * Makes an authenticated API call to the Sage API with custom method and body
+ * Used for endpoints that require POST requests with JSON bodies
+ * 
+ * @param {string} endpoint - API endpoint path
+ * @param {string} method - HTTP method (GET, POST, etc.)
+ * @param {Object} body - Request body to send as JSON
+ * @param {Object} queryParams - Additional query parameters
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @returns {Object} JSON response from the API
+ */
 async function makeProfitApiCall(endpoint, method = "GET", body = null, queryParams = {}, username, password) {
   // Build query string from params
   const queryString = Object.entries({
@@ -2930,6 +3005,7 @@ async function makeProfitApiCall(endpoint, method = "GET", body = null, queryPar
   console.log(`Making ${method} request to: ${url}`);
 
   try {
+    // Make the authenticated request with the specified method and body
     const response = await fetch(url, {
       method: method,
       headers: {
@@ -2942,12 +3018,14 @@ async function makeProfitApiCall(endpoint, method = "GET", body = null, queryPar
 
     console.log(`${endpoint} Status:`, response.status);
 
+    // Handle error responses
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Error response:", errorText);
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
+    // Parse and return the JSON response
     return await response.json();
   } catch (error) {
     console.error(`Error calling ${endpoint}:`, error);
@@ -2955,29 +3033,44 @@ async function makeProfitApiCall(endpoint, method = "GET", body = null, queryPar
   }
 }
 
+/**
+ * Test route for Sage API
+ */
 app.get("/sagetest", async (req, res) => {
   res.render("sagetest");
 });
 
+/**
+ * Generates date ranges for each month from a start date to the current month
+ * Used to create date parameters for fetching historical profit and loss data
+ * 
+ * @param {number} startYear - Year to start from (default: 2024)
+ * @param {number} startMonth - Month to start from (0-11, default: 0 for January)
+ * @returns {Array} Array of date range objects with startDate, endDate, monthName, and year
+ */
 function generateMonthlyDateRanges(startYear = 2024, startMonth = 0) {
   const dateRanges = [];
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
   
+  // Loop through each year from start year to current year
   for (let year = startYear; year <= currentYear; year++) {
     // Determine start month for this year
     const firstMonth = (year === startYear) ? startMonth : 0;
     // Determine end month for this year
     const lastMonth = (year === currentYear) ? currentMonth : 11;
     
+    // Loop through each month in this year
     for (let month = firstMonth; month <= lastMonth; month++) {
       // Create start date (1st of the month)
       const startDate = new Date(year, month, 1);
       
       // Create end date (last day of the month)
+      // Setting day 0 of next month gives the last day of current month
       const endDate = new Date(year, month + 1, 0);
       
+      // Add the date range to the array
       dateRanges.push({
         startDate: formatDate(startDate),
         endDate: formatDate(endDate),
@@ -2990,12 +3083,21 @@ function generateMonthlyDateRanges(startYear = 2024, startMonth = 0) {
   return dateRanges;
 }
 
-// Updated function to get profit and loss for a specific date range with dynamic credentials
+/**
+ * Fetches profit and loss data for a specific month from Sage API
+ * 
+ * @param {string} companyId - Sage company ID
+ * @param {string} fromDate - Start date in YYYY-MM-DD format
+ * @param {string} toDate - End date in YYYY-MM-DD format
+ * @param {string} username - Sage account email
+ * @param {string} password - Sage account password
+ * @returns {Object} Profit and loss data with date context
+ */
 async function getProfitAndLossForSpecificMonth(companyId, fromDate, toDate, username, password) {
   try {
     console.log(`Getting profit and loss report from ${fromDate} to ${toDate}`);
 
-    // Prepare request body according to API documentation
+    // Prepare request body according to Sage API documentation
     const requestBody = {
       FromDate: fromDate,
       ToDate: toDate,
@@ -3016,6 +3118,7 @@ async function getProfitAndLossForSpecificMonth(companyId, fromDate, toDate, use
       password
     );
 
+    // Return the data with date context
     return {
       fromDate,
       toDate,
@@ -3027,7 +3130,10 @@ async function getProfitAndLossForSpecificMonth(companyId, fromDate, toDate, use
   }
 }
 
-// Add this route to render the loading page
+/**
+ * Route handler for the profit and loss loading page
+ * Renders the loading screen for data extraction
+ */
 app.get('/extract-profit-loss', (req, res) => {
   // Check if user is logged in
   if (!req.session.user) {
@@ -3038,97 +3144,27 @@ app.get('/extract-profit-loss', (req, res) => {
   res.render('profit-loss-loading');
 });
 
-// Start the profit and loss process and return a progress ID
-app.post('/start-profit-loss-process', async (req, res) => {
+/**
+ * Processes profit and loss data for each month in the background
+ * Uses a simple boolean flag to track completion
+ * 
+ * @param {string} userid - User ID in the database
+ * @param {Array} dateRanges - Array of date ranges to process
+ * @param {string} companyid - Sage company ID
+ * @param {string} email - Sage account email
+ * @param {string} password - Sage account password
+ */
+async function processMonthlyData(userid, dateRanges, companyid, email, password) {
   try {
-    // Check if user is logged in
-    if (!req.session.user) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Not authenticated' 
-      });
-    }
+    // Set initial status to false (not complete)
+    extractionStatus[userid] = false;
     
-    const companyid = req.session.user.companyid;
-    const userid = req.session.user.userid;
-    const email = req.session.user.email;
-    const password = req.session.user.password;
-    
-    // Generate date ranges for each month from Jan 2024 to now
-    const dateRanges = generateMonthlyDateRanges(2024, 0);
-    
-    // Create a unique progress ID
-    const progressId = uuidv4();
-    
-    // Initialize progress tracking
-    progressTracker[progressId] = {
-      total: dateRanges.length,
-      processed: 0,
-      complete: false,
-      messages: [
-        { message: 'Starting data extraction process...', type: 'info' }
-      ],
-      lastCheckedIndex: 0
-    };
-    
-    // Start the processing in the background
-    processMonthlyData(progressId, dateRanges, companyid, userid, email, password);
-    
-    // Return the progress ID to the client
-    res.json({
-      success: true,
-      progressId: progressId,
-      totalMonths: dateRanges.length
-    });
-  } catch (error) {
-    console.error("Error starting profit and loss process:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to start profit and loss process: " + error.message
-    });
-  }
-});
-
-// Check the progress of a specific process
-app.get('/check-progress/:progressId', (req, res) => {
-  const progressId = req.params.progressId;
-  const progress = progressTracker[progressId];
-  
-  if (!progress) {
-    return res.status(404).json({
-      success: false,
-      error: 'Progress ID not found'
-    });
-  }
-  
-  // Get new messages since last check
-  const newMessages = progress.messages.slice(progress.lastCheckedIndex);
-  progress.lastCheckedIndex = progress.messages.length;
-  
-  res.json({
-    success: true,
-    total: progress.total,
-    processed: progress.processed,
-    complete: progress.complete,
-    newMessages: newMessages
-  });
-});
-
-// Process monthly data in the background
-async function processMonthlyData(progressId, dateRanges, companyid, userid, email, password) {
-  const progress = progressTracker[progressId];
-  
-  try {
     // Process each month sequentially
     for (let i = 0; i < dateRanges.length; i++) {
       const range = dateRanges[i];
       
       try {
-        // Add processing message
-        progress.messages.push({
-          message: `Processing ${range.monthName} ${range.year}...`,
-          type: 'info'
-        });
+        console.log(`Processing ${range.monthName} ${range.year} for user ${userid}`);
         
         // Get profit and loss data for this month
         const profitAndLossData = await getProfitAndLossForSpecificMonth(
@@ -3148,21 +3184,10 @@ async function processMonthlyData(progressId, dateRanges, companyid, userid, ema
         await insertSageCostOfSales(profitAndLossData, userid, recordDate);
         await insertSageTotals(profitAndLossData, userid, recordDate);
         
-        // Update progress
-        progress.processed++;
-        progress.messages.push({
-          message: `Successfully processed ${range.monthName} ${range.year}`,
-          type: 'success'
-        });
+        console.log(`Successfully processed ${range.monthName} ${range.year} for user ${userid}`);
       } catch (error) {
-        console.error(`Failed to process ${range.monthName} ${range.year}:`, error);
-        
-        // Add error message but continue processing
-        progress.processed++;
-        progress.messages.push({
-          message: `Failed to process ${range.monthName} ${range.year}: ${error.message}`,
-          type: 'error'
-        });
+        console.error(`Failed to process ${range.monthName} ${range.year} for user ${userid}:`, error);
+        // Continue with next month even if this one fails
       }
       
       // Add a small delay between API calls to avoid rate limiting
@@ -3177,32 +3202,91 @@ async function processMonthlyData(progressId, dateRanges, companyid, userid, ema
       await closeDb(db);
     }
     
-    // Mark as complete
-    progress.complete = true;
-    progress.messages.push({
-      message: `Completed processing ${dateRanges.length} months of profit and loss data`,
-      type: 'success'
-    });
+    console.log(`Completed processing all months for user ${userid}`);
     
-    // Clean up progress tracker after 10 minutes
+    // Mark extraction as complete for this user
+    extractionStatus[userid] = true;
+    
+    // Clean up status after 1 hour to prevent memory leaks
     setTimeout(() => {
-      delete progressTracker[progressId];
-    }, 10 * 60 * 1000);
+      delete extractionStatus[userid];
+    }, 60 * 60 * 1000);
+    
   } catch (error) {
-    console.error("Error in processMonthlyData:", error);
-    
-    // Add error message
-    progress.messages.push({
-      message: `Error processing data: ${error.message}`,
-      type: 'error'
-    });
-    
-    // Mark as complete with error
-    progress.complete = true;
+    console.error(`Error in processMonthlyData for user ${userid}:`, error);
+    // Mark as complete even on error, so user isn't stuck on loading screen
+    extractionStatus[userid] = true;
   }
 }
 
-// Modified version of your existing route handler to redirect to the loading page
+/**
+ * API endpoint to check if extraction is complete
+ * Used by the frontend to know when to redirect to the dashboard
+ */
+app.get('/check-extraction-complete', (req, res) => {
+  // Check if user is logged in
+  if (!req.session.user) {
+    return res.status(401).json({ 
+      complete: false, 
+      error: 'Not authenticated' 
+    });
+  }
+  
+  const userid = req.session.user.userid;
+  
+  // If no status exists, assume it's complete (handles page refreshes)
+  if (extractionStatus[userid] === undefined) {
+    return res.json({ complete: true });
+  }
+  
+  // Return the current status
+  res.json({ complete: extractionStatus[userid] });
+});
+
+/**
+ * API endpoint to start the profit and loss data extraction process
+ * Initializes the extraction status and starts the background process
+ */
+app.post('/start-profit-loss-process', async (req, res) => {
+  try {
+    // Check if user is logged in
+    if (!req.session.user) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated' 
+      });
+    }
+    
+    // Get user data from session
+    const companyid = req.session.user.companyid;
+    const userid = req.session.user.userid;
+    const email = req.session.user.email;
+    const password = req.session.user.password;
+    
+    // Generate date ranges for each month from Jan 2024 to now
+    const dateRanges = generateMonthlyDateRanges(2024, 0);
+    
+    // Start the processing in the background
+    processMonthlyData(userid, dateRanges, companyid, email, password);
+    
+    // Return success
+    res.json({
+      success: true,
+      message: "Data extraction started"
+    });
+  } catch (error) {
+    console.error("Error starting profit and loss process:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to start profit and loss process: " + error.message
+    });
+  }
+});
+
+/**
+ * Route handler for the profit and loss page
+ * Redirects to the loading page for data extraction
+ */
 app.get("/getProfitandLoss", async (req, res) => {
   // Check if user is logged in
   if (!req.session.user) {
@@ -3213,7 +3297,15 @@ app.get("/getProfitandLoss", async (req, res) => {
   res.redirect('/extract-profit-loss');
 });
 
-// Modified getSageRevenue function to accept a custom date
+/**
+ * Extracts and stores revenue data from profit and loss report
+ * Uses manual upsert logic to update existing records or insert new ones
+ * 
+ * @param {Object} profitandlossdata - Profit and loss data from Sage API
+ * @param {string} userid - User ID in the database
+ * @param {Date} customDate - Date to use for the records (default: current date)
+ * @returns {Array} Processed revenue data
+ */
 async function getSageRevenue(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3222,9 +3314,10 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
     const date = customDate || new Date();
     
     // Extract revenue data using JSONPath
+    // This finds the "Sales" section and gets all its children
     const revenue = jsonpath.query(profitandlossdata.data, '$[?(@.Description=="Sales")].Children[*]');
     
-    // Map to simplified format
+    // Map to simplified format with just name and amount
     const salesExtracted = revenue.map(item => ({
       name: item.Description,
       amount: item.Total[0]
@@ -3232,7 +3325,7 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
     
     // For each revenue item, check if it exists and update or insert accordingly
     for (const revenue of salesExtracted) {
-      // Check if record exists
+      // Check if record exists for this user, category, and date
       const existingRecord = await db.query(
         `SELECT * FROM sage_revenue WHERE userid = $1 AND category = $2 AND date = $3`,
         [userid, revenue.name, date]
@@ -3259,13 +3352,22 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
     console.error(`Error in getSageRevenue for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
     throw err;
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 }
 
-// Modified insertSageExpenses function to use manual upsert without schema changes
+/**
+ * Extracts and stores expense data from profit and loss report
+ * Uses manual upsert logic to update existing records or insert new ones
+ * 
+ * @param {Object} profitandlossdata - Profit and loss data from Sage API
+ * @param {string} userid - User ID in the database
+ * @param {Date} customDate - Date to use for the records (default: current date)
+ * @returns {Array} Processed expense data
+ */
 async function insertSageExpenses(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3274,9 +3376,10 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
     const formattedDate = customDate || new Date();
     
     // Extract expenses data using JSONPath
+    // This finds the "Expenses" section and gets all its children
     const expenses = jsonpath.query(profitandlossdata.data, '$[?(@.Description=="Expenses")].Children[*]');
     
-    // Map to simplified format
+    // Map to simplified format with just name and amount
     const expensesExtracted = expenses.map(item => ({
       name: item.Description,
       amount: item.Total[0],
@@ -3284,7 +3387,7 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
     
     // For each expense item, check if it exists and update or insert accordingly
     for (const expense of expensesExtracted) {
-      // Check if record exists
+      // Check if record exists for this user, category, and date
       const existingRecord = await db.query(
         `SELECT * FROM sage_expenses WHERE userid = $1 AND category = $2 AND date = $3`,
         [userid, expense.name, formattedDate]
@@ -3311,13 +3414,22 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
     console.error(`Error in insertSageExpenses for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
     throw err;
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 }
 
-// Modified insertSageCostOfSales function to use manual upsert without schema changes
+/**
+ * Extracts and stores cost of sales data from profit and loss report
+ * Uses manual upsert logic to update existing records or insert new ones
+ * 
+ * @param {Object} profitandlossdata - Profit and loss data from Sage API
+ * @param {string} userid - User ID in the database
+ * @param {Date} customDate - Date to use for the records (default: current date)
+ * @returns {Array} Processed cost of sales data
+ */
 async function insertSageCostOfSales(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3326,17 +3438,19 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
     const formattedDate = customDate || new Date();
     
     // Extract cost of sales data using JSONPath
+    // This finds the "Cost of Sales" section and gets all its children
     const costOfSales = jsonpath.query(profitandlossdata.data, '$[?(@.Description=="Cost of Sales")].Children[*]');
     
-    // Map to simplified format
+    // Map to simplified format with just name and amount
+    // Handle case where Total might be missing by defaulting to 0
     const costOfSalesExtracted = costOfSales.map(item => ({
       name: item.Description,
-      amount: item.Total ? item.Total[0] : 0, // Handle case where Total might be missing
+      amount: item.Total ? item.Total[0] : 0,
     }));
     
     // For each cost of sales item, check if it exists and update or insert accordingly
     for (const item of costOfSalesExtracted) {
-      // Check if record exists
+      // Check if record exists for this user, category, and date
       const existingRecord = await db.query(
         `SELECT * FROM sage_costofsales WHERE userid = $1 AND category = $2 AND date = $3`,
         [userid, item.name, formattedDate]
@@ -3363,13 +3477,22 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
     console.error(`Error in insertSageCostOfSales for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
     throw err;
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 }
 
-// Modified insertSageTotals function to use manual upsert without schema changes
+/**
+ * Extracts and stores financial totals from profit and loss report
+ * Uses manual upsert logic to update existing records or insert new ones
+ * 
+ * @param {Object} profitandlossdata - Profit and loss data from Sage API
+ * @param {string} userid - User ID in the database
+ * @param {Date} customDate - Date to use for the records (default: current date)
+ * @returns {Object} Processed financial totals
+ */
 async function insertSageTotals(profitandlossdata, userid, customDate = null) {
   let db;
   
@@ -3377,10 +3500,12 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
     db = await connectDb();
     const formattedDate = customDate || new Date();
     
-    // Extract totals data using JSONPath (items with ReportingLevelType = 10)
+    // Extract totals data using JSONPath
+    // This finds items with ReportingLevelType = 10, which are the summary totals
     const totals = jsonpath.query(profitandlossdata.data, '$[?(@.ReportingLevelType==10)]');
     
     // Extract specific totals by their Description
+    // Use optional chaining and nullish coalescing to handle missing data
     const grossProfit = totals.find(item => item.Description === "Gross Profit")?.Total?.[0] || 0;
     const netProfit = totals.find(item => item.Description === "Net Profit Or Loss After Tax")?.Total?.[0] || 0;
     
@@ -3436,88 +3561,131 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
     console.error(`Error in insertSageTotals for date ${customDate ? formatDate(customDate) : 'current date'}:`, err);
     throw err;
   } finally {
+    // Always close the database connection
     if (db) {
       await closeDb(db);
     }
   }
 }
 
-//// Graph sqls ///
+/**
+ * Route handler for the company dashboard page
+ * Serves the HTML file for the dashboard
+ */
 app.get('/sagecompany', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'sage_company.html'));
 });
 
+/**
+ * API endpoint to get company financial data for the dashboard
+ * Returns sales, cost, and gross profit data
+ */
 app.get('/api/sagecompany', async (req, res) => {
   const db = await connectDb();
   const userid = req.session.user.userid;
 
   try {
+    // Get financial data for this user
     const result = await db.query('SELECT date, sumofsales, sumofcost, grossprofit FROM sage_company_calcs WHERE userid = $1 ORDER BY date', [userid]);
+    
+    // Get the most recent data date
     const lastEntryDate = await db.query(`SELECT date FROM sage_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`, [userid]);
+    
+    // Return both the data and the last entry date
     res.json({data: result.rows, lastEntryDate: lastEntryDate.rows[0].date});
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   } finally {
+    // Always close the database connection
     await closeDb(db);
   }
 });
 
-// API endpoint to get profit data
+/**
+ * API endpoint to get profit data for the dashboard
+ * Returns gross profit, operating expenses, and net profit
+ */
 app.get('/api/sageprofit', async (req, res) => {
   const db = await connectDb();
   const userid = req.session.user.userid;
   try {
+    // Get profit data for this user
     const result = await db.query('SELECT date, grossprofit, opexpenses, netprofit FROM sage_company_calcs WHERE userid = $1 ORDER BY date', [userid]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   } finally {
+    // Always close the database connection
     await closeDb(db);
   }
 });
 
+/**
+ * API endpoint to get expense data for the dashboard
+ * Returns expense amounts by category
+ */
 app.get('/api/sageexpenses', async (req, res) => {
   const db = await connectDb();
   const userid = req.session.user.userid;
   try {
+    // Get expense data for this user
     const result = await db.query('SELECT date, amount, category FROM sage_expenses WHERE userid = $1 ORDER BY category', [userid]);
+    
+    // Get the most recent data date
     const lastEntryDate = await db.query(`SELECT date FROM sage_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`, [userid]);
+    
     console.log(result.rows);
+    
+    // Return both the data and the last entry date
     res.json({data: result.rows, lastEntryDate: lastEntryDate.rows[0].date});
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   } finally {
+    // Always close the database connection
     await closeDb(db);
   }
 });
 
+/**
+ * API endpoint to get revenue data for the dashboard
+ * Returns revenue amounts by category
+ */
 app.get('/api/sagerevenue', async (req, res) => {
   const db = await connectDb();
   const userid = req.session.user.userid;
   try {
+    // Get revenue data for this user
     const result = await db.query('SELECT date, category, revenue FROM sage_revenue WHERE userid = $1 ORDER BY date', [userid]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   } finally {
+    // Always close the database connection
     await closeDb(db);
   }
 });
 
+/**
+ * API endpoint to get cost of sales data for the dashboard
+ * Returns cost of sales amounts
+ */
 app.get('/api/sagecostofsales', async (req, res) => {
   const db = await connectDb();
   const userid = req.session.user.userid;
   try {
+    // Get cost of sales data for this user
     const result = await db.query('SELECT date, costofsales FROM sage_costofsales WHERE userid = $1 ORDER BY date', [userid]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
   } finally {
+    // Always close the database connection
     await closeDb(db);
   }
 });
+
