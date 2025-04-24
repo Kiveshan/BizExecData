@@ -657,7 +657,11 @@ app.get('/deactivate/:userid', async(req,res)=>{
 
 
 
-
+// In-memory storage for extraction progress tracking
+const extractionStatus = {
+  sage: {}, // Keep the existing Sage status tracking
+  quickbooks: {} // Add QuickBooks status tracking
+};
 
 
 
@@ -700,91 +704,100 @@ app.get('/auth', (req, res) => {
   res.redirect(authUri); // Redirect the user to the QuickBooks authorization URL
 });
 
-app.get(authurl, async(req, res) => {
-  const date = new Date()
+// Replace the existing /auth/callback route in api.js with this updated version
+app.get(authurl, async (req, res) => {
+  const date = new Date();
   const db = await connectDb();
   try {
-    await oauthClient.createToken(req.url) // Exchange the authorization code for an access token
-      .then(function(authResponse) {
+    await oauthClient
+      .createToken(req.url) // Exchange the authorization code for an access token
+      .then((authResponse) => {
         oauth2_token_json = JSON.stringify(authResponse.json, null, 2); // Store the token as a JSON string
         console.log(oauth2_token_json); // Log the token to the console
-        });
-        const companyID = oauthClient.getToken().realmId;
+      });
+    const companyID = oauthClient.getToken().realmId;
 
     // Make an API call to fetch company info
     const authResponse = await oauthClient.makeApiCall({
-      url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=73`,
+      url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=75`,
     });
 
     // Log the response
-    console.log(`\nThe response for API call is: ${JSON.stringify(authResponse.json)}`);
+    console.log(`
+The response for API call is: ${JSON.stringify(authResponse.json)}`);
 
     // Extract the company info from the response
     const companyInfo = authResponse.json.QueryResponse.CompanyInfo[0];
 
     // Extract relevant fields
     const companyName = companyInfo.CompanyName || companyInfo.LegalName;
-    const email = companyInfo.Email?.Address || '';
-    const phone = companyInfo.PrimaryPhone?.FreeFormNumber || '';  // No phone in this example
+    const email = companyInfo.Email?.Address || "";
+    const phone = companyInfo.PrimaryPhone?.FreeFormNumber || ""; // No phone in this example
     const address = `${companyInfo.CompanyAddr?.Line1}, ${companyInfo.CompanyAddr?.City}, ${companyInfo.CompanyAddr?.CountrySubDivisionCode}, ${companyInfo.CompanyAddr?.PostalCode}`;
-    const industryType = companyInfo.NameValue.find(nv => nv.Name === 'QBOIndustryType')?.Value || '';
-
-    // Connect to the database
-    
-
-    
+    const industryType = companyInfo.NameValue.find((nv) => nv.Name === "QBOIndustryType")?.Value || "";
 
     // Check if the email or company name already exist in the database
-    const existingUser = await db.query(
-      'SELECT * FROM user_table WHERE company_id = $1',
-      [companyID]
-    );
+    const existingUser = await db.query("SELECT * FROM user_table WHERE company_id = $1", [companyID]);
 
-    const exsistingLicense = await db.query(`SELECT * FROM license_management WHERE userid = $1 `,[companyID])
+    const exsistingLicense = await db.query(`SELECT * FROM license_management WHERE userid = $1 `, [companyID]);
 
     if (existingUser.rows.length === 0) {
       // If no user found, insert new company info into the user_table table
       const result = await db.query(
         `INSERT INTO user_table (firstname, surname, company_id, company_name, email, address, company_services, first_time_insertion, accounting_software)
          VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Quickbooks')
-         RETURNING company_id`,  // This will return the userid of the inserted record
+         RETURNING company_id`, // This will return the userid of the inserted record
         [companyID, companyName, email, address, industryType, false]
       );
-      
+
       // Extract the returned userid
       const newUserId = result.rows[0].company_id;
-      const currentDate = new Date();  // Get the current date
- // Add one year to expiration date
+      const currentDate = new Date(); // Get the current date
+      // Add one year to expiration date
 
-await db.query(`
+      await db.query(
+        `
     INSERT INTO license_management (owner_name, company_name, status, date_submitted, userid)
     VALUES ('N/A', $1, 'Pending', $2, $3)
-`, [companyName, currentDate, newUserId]);
+`,
+        [companyName, currentDate, newUserId]
+      );
 
-      console.log('Company info inserted successfully.');
-      return res.redirect(`/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`);
+      console.log("Company info inserted successfully.");
+      return res.redirect(
+        `/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
+      );
     }
-    if (existingUser.rows[0].status==='pending'|| existingUser.rows[0].status === 'rejected' || exsistingLicense.rows[0].status ==='Pending' || exsistingLicense.rows[0].status === 'Deactivated' ){
-      return res.redirect(`/index.html?message=Your account is ${existingUser.rows[0].status} and your License is ${exsistingLicense.rows[0].status}. Please contact our support team.`);
+    if (
+      existingUser.rows[0].status === "pending" ||
+      existingUser.rows[0].status === "rejected" ||
+      exsistingLicense.rows[0].status === "Pending" ||
+      exsistingLicense.rows[0].status === "Deactivated"
+    ) {
+      return res.redirect(
+        `/index.html?message=Your account is ${existingUser.rows[0].status} and your License is ${exsistingLicense.rows[0].status}. Please contact our support team.`
+      );
     }
 
-    if (existingUser.rows[0].status === 'approved' && existingUser.rows[0].first_time_insertion === false && exsistingLicense.rows[0].status ==='Paid') {
+    if (
+      existingUser.rows[0].status === "approved" &&
+      existingUser.rows[0].first_time_insertion === false &&
+      exsistingLicense.rows[0].status === "Paid"
+    ) {
       req.session.userid = existingUser.rows[0].userid;
-      res.redirect(`/update`);
-    }
-
-    else{
-      req.session.userid = existingUser.rows[0].userid
-      res.redirect('/company')
+      // Redirect to the loading page instead of directly to update
+      res.redirect(`/quickbooks-loading`);
+    } else {
+      req.session.userid = existingUser.rows[0].userid;
+      res.redirect("/company");
     }
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error occurred while fetching company data.');
+    res.status(500).send("Error occurred while fetching company data.");
   } finally {
-      await closeDb(db); // Ensure the connection is closed
+    await closeDb(db); // Ensure the connection is closed
   }
-  });
-
+});
 
   app.get('/update', async (req, res) => {
     const userid = req.session.userid;
@@ -1222,12 +1235,330 @@ app.get('/fetch-otherincome', async (req, res) => {
 
 
 
+// Add this route to api.js
+app.get("/quickbooks-loading", (req, res) => {
+  // Check if user is authenticated
+  if (!req.session.userid) {
+    return res.redirect("/login");
+  }
+  
+  // Render the existing loading page with a source parameter
+  res.render("profit-loss-loading", { 
+    source: "quickbooks",
+    title: "Extracting QuickBooks Data",
+    description: "We're extracting your profit and loss data from QuickBooks."
+  });
+});
   
   
+// Add these routes to api.js
+
+// API endpoint to start the QuickBooks data extraction process
+app.post("/start-quickbooks-extraction", async (req, res) => {
+  try {
+    // Check if user is authenticated
+    if (!req.session.userid) {
+      return res.status(401).json({
+        success: false,
+        error: "Not authenticated",
+      });
+    }
+
+    const userid = req.session.userid;
+
+    // Set initial status to false (not complete)
+    extractionStatus.quickbooks[userid] = false;
+
+    // Start the extraction process in the background
+    processQuickBooksData(userid);
+
+    // Return success
+    res.json({
+      success: true,
+      message: "Data extraction started",
+    });
+  } catch (error) {
+    console.error("Error starting QuickBooks extraction:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to start QuickBooks extraction: " + error.message,
+    });
+  }
+});
+
+// API endpoint to check if QuickBooks extraction is complete
+app.get("/check-quickbooks-extraction", (req, res) => {
+  // Check if user is authenticated
+  if (!req.session.userid) {
+    return res.status(401).json({
+      complete: false,
+      error: "Not authenticated",
+    });
+  }
+
+  const userid = req.session.userid;
+
+  // If no status exists, assume it's complete (handles page refreshes)
+  if (extractionStatus.quickbooks[userid] === undefined) {
+    return res.json({ complete: true });
+  }
+
+  // Return the current status
+  res.json({ complete: extractionStatus.quickbooks[userid] });
+});
   
-  
-  
-  
+
+
+// Add this function to api.js
+
+// Process QuickBooks data in the background
+async function processQuickBooksData(userid) {
+  try {
+    const startDate = "2024-01-01";
+    const currentDate = new Date();
+    const date = new Date(startDate);
+    const companyID = oauthClient.getToken().realmId;
+
+    // Connect to the database once for the whole process
+    const db = await connectDb();
+
+    try {
+      while (date <= currentDate) {
+        const startOfMonth = formatDate(date);
+        const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        const endOfMonth = formatDate(endOfMonthDate);
+
+        const obj = {};
+
+        function logSpecificSummaryValue(rows, index) {
+          if (!rows) return;
+          rows.forEach((row) => {
+            if (row.Summary) {
+              const specificValue = row.Summary.ColData[index]?.value || 0;
+              obj[row.Summary.ColData[0].value] = specificValue;
+            }
+            if (row.Rows && row.Rows.Row) {
+              logSpecificSummaryValue(row.Rows.Row, index);
+            }
+          });
+        }
+
+        try {
+          const authResponse = await oauthClient.makeApiCall({
+            url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/reports/ProfitAndLossDetail?start_date=${startOfMonth}&end_date=${endOfMonth}`,
+          });
+          const reportData = authResponse.json;
+
+          if (!reportData.Rows || !reportData.Rows.Row) {
+            date.setMonth(date.getMonth() + 1);
+            continue;
+          }
+
+          const specificIndex = 6;
+          logSpecificSummaryValue(reportData.Rows.Row, specificIndex);
+
+          const Expense =
+            (Number.parseFloat(obj["Total for Expenses"]) || 0) + (Number.parseFloat(obj["Total for Other Expense"]) || 0);
+          const Income =
+            (Number.parseFloat(obj["Total for Income"]) || 0) + (Number.parseFloat(obj["Total for Other Income"]) || 0);
+          const grossProfit = Number.parseFloat(obj["Gross Profit"]) || 0;
+          const netIncome = Number.parseFloat(obj["Net Income"]) || 0;
+          const costOfGoodsSold = Number.parseFloat(obj["Total for Cost of Goods Sold"]) || 0;
+
+          // Check if the data for this month and user already exists
+          const duplicateCheckQuery = `
+            SELECT * FROM company_calcs 
+            WHERE userid = $1 AND date = $2
+          `;
+          const duplicateCheckResult = await db.query(duplicateCheckQuery, [userid, endOfMonth]);
+
+          if (duplicateCheckResult.rowCount > 0) {
+            // Update existing record if entry for this month already exists
+            const updateQuery = `
+              UPDATE company_calcs 
+              SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5
+              WHERE userid = $6 AND date = $7
+            `;
+            const updateValues = [
+              grossProfit.toFixed(2),
+              Expense.toFixed(2),
+              netIncome.toFixed(2),
+              Income.toFixed(2),
+              costOfGoodsSold.toFixed(2),
+              userid,
+              endOfMonth,
+            ];
+            await db.query(updateQuery, updateValues);
+            console.log(`Data for ${startOfMonth} updated successfully.`);
+          } else {
+            // Insert new record if no existing entry for this month
+            const insertQuery = `
+              INSERT INTO company_calcs (
+                userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `;
+            const insertValues = [
+              userid,
+              grossProfit.toFixed(2),
+              Expense.toFixed(2),
+              netIncome.toFixed(2),
+              Income.toFixed(2),
+              costOfGoodsSold.toFixed(2),
+              endOfMonth,
+            ];
+            await db.query(insertQuery, insertValues);
+            console.log(`Data for ${startOfMonth} inserted successfully.`);
+          }
+        } catch (e) {
+          console.error(`Error processing data for ${startOfMonth}:`, e);
+        }
+
+        date.setMonth(date.getMonth() + 1);
+      }
+
+      // Process additional data
+      await processAdditionalQuickBooksData(userid, companyID);
+
+      // Update the first_time_insertion flag
+      await db.query("UPDATE user_table SET first_time_insertion = true WHERE userid = $1", [userid]);
+
+      // Mark extraction as complete
+      extractionStatus.quickbooks[userid] = true;
+
+      // Clean up status after 1 hour to prevent memory leaks
+      setTimeout(() => {
+        delete extractionStatus.quickbooks[userid];
+      }, 60 * 60 * 1000);
+
+    } catch (error) {
+      console.error("Error in QuickBooks data processing:", error);
+      // Mark as complete even on error, so user isn't stuck on loading screen
+      extractionStatus.quickbooks[userid] = true;
+    } finally {
+      // Closing database connection
+      await closeDb(db);
+    }
+  } catch (error) {
+    console.error("Error in processQuickBooksData:", error);
+    // Mark as complete even on error, so user isn't stuck on loading screen
+    extractionStatus.quickbooks[userid] = true;
+  }
+}
+
+// Process additional QuickBooks data (income, cost, expenses)
+async function processAdditionalQuickBooksData(userid, companyID) {
+  try {
+    // Process income data
+    await processIncomeData(userid, companyID);
+    
+    // Process cost of sales data
+    await processCostData(userid, companyID);
+    
+    // Process expenses data
+    await processExpensesData(userid, companyID);
+    
+    // Process other income data
+    await processOtherIncomeData(userid, companyID);
+    
+    console.log("All additional QuickBooks data processed successfully");
+  } catch (error) {
+    console.error("Error processing additional QuickBooks data:", error);
+    throw error;
+  }
+}
+
+// These functions should call your existing fetch-income, fetch-cost, etc. logic
+async function processIncomeData(userid, companyID) {
+  const startDate = "2024-01-01";
+  const currentDate = new Date();
+  const date = new Date(startDate);
+
+  while (date <= currentDate) {
+    const startOfMonth = formatDate(date);
+    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const endOfMonth = formatDate(endOfMonthDate);
+
+    try {
+      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const incomeRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "Income")]');
+      await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
+    } catch (err) {
+      console.error("Error extracting and saving income transactions:", err);
+    }
+
+    // Move to next month
+    date.setMonth(date.getMonth() + 1);
+  }
+}
+
+async function processCostData(userid, companyID) {
+  const startDate = "2024-01-01";
+  const currentDate = new Date();
+  const date = new Date(startDate);
+
+  while (date <= currentDate) {
+    const startOfMonth = formatDate(date);
+    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const endOfMonth = formatDate(endOfMonthDate);
+
+    try {
+      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const costRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "COGS")]');
+      await findFinancialData(costRows, userid, endOfMonth, upsertCOGS);
+    } catch (err) {
+      console.error("Error extracting and saving cost transactions:", err);
+    }
+
+    // Move to next month
+    date.setMonth(date.getMonth() + 1);
+  }
+}
+
+async function processExpensesData(userid, companyID) {
+  const startDate = "2024-01-01";
+  const currentDate = new Date();
+  const date = new Date(startDate);
+
+  while (date <= currentDate) {
+    const startOfMonth = formatDate(date);
+    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const endOfMonth = formatDate(endOfMonthDate);
+
+    try {
+      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const expenseRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "Expenses")]');
+      await findFinancialData(expenseRows, userid, endOfMonth, upsertExpenses);
+    } catch (err) {
+      console.error("Error extracting and saving expense transactions:", err);
+    }
+
+    // Move to next month
+    date.setMonth(date.getMonth() + 1);
+  }
+}
+
+async function processOtherIncomeData(userid, companyID) {
+  const startDate = "2024-01-01";
+  const currentDate = new Date();
+  const date = new Date(startDate);
+
+  while (date <= currentDate) {
+    const startOfMonth = formatDate(date);
+    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const endOfMonth = formatDate(endOfMonthDate);
+
+    try {
+      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const otherIncomeRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "OtherIncome")]');
+      await findFinancialData(otherIncomeRows, userid, endOfMonth, upsertRevenue);
+    } catch (err) {
+      console.error("Error extracting and saving other income transactions:", err);
+    }
+
+    // Move to next month
+    date.setMonth(date.getMonth() + 1);
+  }
+}
   
   
   
@@ -2589,9 +2920,6 @@ import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 
-// In-memory storage for progress tracking
-// In a production environment, consider using Redis or another shared storage
-const extractionStatus = {};
 
 /**
  * Helper function to format a Date object as YYYY-MM-DD string
@@ -3134,14 +3462,19 @@ async function getProfitAndLossForSpecificMonth(companyId, fromDate, toDate, use
  * Route handler for the profit and loss loading page
  * Renders the loading screen for data extraction
  */
-app.get('/extract-profit-loss', (req, res) => {
+// Update the existing /extract-profit-loss route
+app.get("/extract-profit-loss", (req, res) => {
   // Check if user is logged in
   if (!req.session.user) {
-    return res.redirect('/sagelogin');
+    return res.redirect("/sagelogin");
   }
-  
-  // Render the loading page
-  res.render('profit-loss-loading');
+
+  // Render the loading page with Sage-specific parameters
+  res.render("profit-loss-loading", {
+    source: "sage",
+    title: "Extracting Sage Data",
+    description: "We're extracting your profit and loss data from Sage."
+  });
 });
 
 /**
