@@ -3490,7 +3490,7 @@ app.get("/extract-profit-loss", (req, res) => {
 async function processMonthlyData(userid, dateRanges, companyid, email, password) {
   try {
     // Set initial status to false (not complete)
-    extractionStatus[userid] = false;
+    extractionStatus.sage[userid] = false;
     
     // Process each month sequentially
     for (let i = 0; i < dateRanges.length; i++) {
@@ -3538,17 +3538,17 @@ async function processMonthlyData(userid, dateRanges, companyid, email, password
     console.log(`Completed processing all months for user ${userid}`);
     
     // Mark extraction as complete for this user
-    extractionStatus[userid] = true;
+    extractionStatus.sage[userid] = true;
     
     // Clean up status after 1 hour to prevent memory leaks
     setTimeout(() => {
-      delete extractionStatus[userid];
+      delete extractionStatus.sage[userid];
     }, 60 * 60 * 1000);
     
   } catch (error) {
     console.error(`Error in processMonthlyData for user ${userid}:`, error);
     // Mark as complete even on error, so user isn't stuck on loading screen
-    extractionStatus[userid] = true;
+    extractionStatus.sage[userid] = true;
   }
 }
 
@@ -3568,12 +3568,12 @@ app.get('/check-extraction-complete', (req, res) => {
   const userid = req.session.user.userid;
   
   // If no status exists, assume it's complete (handles page refreshes)
-  if (extractionStatus[userid] === undefined) {
+  if (extractionStatus.sage[userid] === undefined) {
     return res.json({ complete: true });
   }
   
   // Return the current status
-  res.json({ complete: extractionStatus[userid] });
+  res.json({ complete: extractionStatus.sage[userid] });
 });
 
 /**
