@@ -74,9 +74,21 @@
            const source = "<%= source || 'sage' %>";
            
            // Define API endpoints based on source
-           const startEndpoint = source === 'quickbooks' ? '/start-quickbooks-extraction' : '/start-profit-loss-process';
-           const checkEndpoint = source === 'quickbooks' ? '/check-quickbooks-extraction' : '/check-extraction-complete';
-           const redirectUrl = source === 'quickbooks' ? '/company' : '/sagecompany';
+           let startEndpoint, checkEndpoint, redirectUrl;
+           if (source === 'quickbooks') {
+               startEndpoint = '/start-quickbooks-extraction';
+               checkEndpoint = '/check-quickbooks-extraction';
+               redirectUrl = '/company';
+           } else if (source === 'xero') {
+               startEndpoint = '/start-xero-extraction';
+               checkEndpoint = '/check-xero-extraction';
+               redirectUrl = '/xerocompany';
+           } else {
+               // Default to Sage
+               startEndpoint = '/start-profit-loss-process';
+               checkEndpoint = '/check-extraction-complete';
+               redirectUrl = '/sagecompany';
+           }
            
            // Start the extraction process when the page loads
            startExtraction();
