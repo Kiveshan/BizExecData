@@ -660,7 +660,8 @@ app.get('/deactivate/:userid', async(req,res)=>{
 // In-memory storage for extraction progress tracking
 const extractionStatus = {
   sage: {}, // Keep the existing Sage status tracking
-  quickbooks: {} // Add QuickBooks status tracking
+  quickbooks: {}, // Add QuickBooks status tracking
+  xero : {}
 };
 
 
@@ -2577,73 +2578,81 @@ async function insertCostofSales(db, userid, costofsales, date) {
 }
 
 
+// Xero Loading Screen
+app.get('/xero-loading', async (req, res) => {
+  // Check if user is authenticated
+  if (!req.session.userid) {
+    return res.redirect("/login");
+  }
 
-// Main GET route
-app.get('/profit', async (req, res) => {
-  const userid = req.session.userid;
-  const db = await connectDb();
+  // Render the existing loading page with Xero parameters
+  res.render("profit-loss-loading", {
+    source: "xero",
+    title: "Extracting Xero Data",
+    description: "We're extracting your profit and loss data from Xero."
+  });
+});
+
+// API endpoint to start the Xero data extraction process
+app.post("/start-xero-extraction", async (req, res) => {
   try {
-    if (!xero.tenants || xero.tenants.length === 0) {
-      throw new Error('No tenants available. Please connect to Xero first.');
+    // Check if user is authenticated
+    if (!req.session.userid) {
+      return res.status(401).json({
+        success: false,
+        error: "Not authenticated",
+      });
     }
 
-    const tenantId = xero.tenants[0].tenantId;
-    const startYear = 2023;
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1;
+    const userid = req.session.userid;
 
-    for (let year = startYear; year <= currentYear; year++) {
-      const monthLimit = (year === currentYear) ? currentMonth : 12;
+    // Set initial status to false (not complete)
+    extractionStatus.xero[userid] = false;
 
-      for (let month = 1; month <= monthLimit; month++) {
-        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-        const endDate = new Date(year, month, 0);
-        const formattedEndDate = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    // Start the extraction process in the background
+    processXeroData(userid);
 
-        const query = await xero.accountingApi.getReportProfitAndLoss(tenantId, startDate, formattedEndDate);
-        const response = query.body;
-
-        if (response && response.reports && response.reports.length > 0) {
-          const summaryData = extractXeroSummaryData(response);
-
-          if (summaryData.grossProfit == 0.00 && summaryData.netProfit == 0.00) {
-            console.log(`Skipping ${year}-${month} as all values are 0.`);
-            continue;
-          }
-
-          await insertXeroSummaryData(db, summaryData, userid, formattedEndDate);
-
-          const expenses = extractXeroExpenses(response, formattedEndDate);
-          await insertExpenses(db, userid, expenses);
-
-          const income = extractXeroIncome(response);
-          await insertIncome(db, userid, income, formattedEndDate);
-
-          const costofsales = extractXeroCostOfSales(response);
-          if (costofsales && costofsales.length > 0) {
-            await insertCostofSales(db, userid, costofsales, formattedEndDate);
-          }
-        }
-      }
-    }
-
-    await db.query('UPDATE user_table SET first_time_insertion = true WHERE userid = $1', [userid]);
-    res.redirect('/xerocompany');
-
-  } catch (err) {
-    const errorMessage = err.response?.body ? JSON.stringify(err.response.body, null, 2) : err.message;
-    console.log(`Error: ${errorMessage}`);
-    res.status(err.response?.statusCode || 500).send('Failed to get Profit and Loss report');
-  } finally {
-    await closeDb(db);
+    // Return success
+    res.json({
+      success: true,
+      message: "Data extraction started",
+    });
+  } catch (error) {
+    console.error("Error starting Xero extraction:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to start Xero extraction: " + error.message,
+    });
   }
 });
 
-app.get('/update_xerodashboard', async (req, res) => {
+// API endpoint to check if Xero extraction is complete
+app.get("/check-xero-extraction", (req, res) => {
+  // Check if user is authenticated
+  if (!req.session.userid) {
+    return res.status(401).json({
+      complete: false,
+      error: "Not authenticated",
+    });
+  }
+
   const userid = req.session.userid;
-  const db = await connectDb();
+
+  // If no status exists, assume it's complete (handles page refreshes)
+  if (extractionStatus.xero[userid] === undefined) {
+    return res.json({ complete: true });
+  }
+
+  // Return the current status
+  res.json({ complete: extractionStatus.xero[userid] });
+});
+
+// Process Xero data in the background
+async function processXeroData(userid) {
+  let db;
   try {
+    db = await connectDb();
+    
     if (!xero.tenants || xero.tenants.length === 0) {
       throw new Error('No tenants available. Please connect to Xero first.');
     }
@@ -2655,17 +2664,22 @@ app.get('/update_xerodashboard', async (req, res) => {
     const currentMonth = today.getMonth() + 1;
 
     for (let year = startYear; year <= currentYear; year++) {
-      const monthLimit = (year === currentYear) ? currentMonth : 12;
+      const endMonth = (year === currentYear) ? currentMonth : 12;
+      for (let month = 1; month <= endMonth; month++) {
+        const formattedStartDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const formattedEndDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-      for (let month = 1; month <= monthLimit; month++) {
-        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-        const endDate = new Date(year, month, 0);
-        const formattedEndDate = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+        const response = await xero.accountingApi.getReportProfitAndLoss(
+          tenantId,
+          formattedStartDate,
+          formattedEndDate,
+          null,
+          null,
+          false,
+          ['Income', 'Expense', 'DirectCosts']
+        );
 
-        const query = await xero.accountingApi.getReportProfitAndLoss(tenantId, startDate, formattedEndDate);
-        const response = query.body;
-
-        if (response && response.reports && response.reports.length > 0) {
+        if (response.body.reports && response.body.reports.length > 0) {
           const summaryData = extractXeroSummaryData(response);
 
           if (summaryData.grossProfit == 0.00 && summaryData.netProfit == 0.00) {
@@ -2673,87 +2687,82 @@ app.get('/update_xerodashboard', async (req, res) => {
             continue;
           }
 
-          const existingData = await db.query('SELECT * FROM xero_company_calcs WHERE userid = $1 AND date = $2', [userid, formattedEndDate]);
+          const existingData = await db.query(
+            'SELECT * FROM xero_company_calcs WHERE userid = $1 AND date = $2',
+            [userid, formattedEndDate]
+          );
 
           if (existingData.rowCount === 0) {
             await insertXeroSummaryData(db, summaryData, userid, formattedEndDate);
           } else {
             const existingRecord = existingData.rows[0];
-            
-            if (existingRecord.totalIncome !== summaryData.totalIncome || 
-                existingRecord.totalExpenses !== summaryData.totalExpenses || 
-                existingRecord.grossProfit !== summaryData.grossProfit || 
-                existingRecord.netProfit !== summaryData.netProfit ||
-                existingRecord.totalCost !== summaryData.totalCost) {
-                
-              await db.query('UPDATE xero_company_calcs SET sumofsales = $1, opexpenses = $2, grossprofit = $3, netprofit = $4, sumofcost = $5 WHERE userid = $6 AND date = $7',
-              [summaryData.totalIncome, summaryData.totalExpenses, summaryData.grossProfit, summaryData.netProfit, summaryData.totalCost, userid, formattedEndDate]);
+            if (
+              existingRecord.sumofsales !== summaryData.totalIncome ||
+              existingRecord.opexpenses !== summaryData.totalExpenses ||
+              existingRecord.grossprofit !== summaryData.grossProfit ||
+              existingRecord.netprofit !== summaryData.netProfit ||
+              existingRecord.sumofcost !== summaryData.totalCost
+            ) {
+              await db.query(
+                'UPDATE xero_company_calcs SET sumofsales = $1, opexpenses = $2, grossprofit = $3, netprofit = $4, sumofcost = $5 WHERE userid = $6 AND date = $7',
+                [
+                  summaryData.totalIncome,
+                  summaryData.totalExpenses,
+                  summaryData.grossProfit,
+                  summaryData.netProfit,
+                  summaryData.totalCost,
+                  userid,
+                  formattedEndDate
+                ]
+              );
             }
           }
 
           const expenses = extractXeroExpenses(response, formattedEndDate);
-
           for (const expense of expenses) {
             const existingExpense = await db.query(
               'SELECT * FROM xero_expenses WHERE userid = $1 AND date = $2 AND category = $3',
               [userid, expense.date, expense.accountName]
             );
-          
             if (existingExpense.rowCount === 0) {
               await db.query(
                 'INSERT INTO xero_expenses (userid, date, category, amount) VALUES ($1, $2, $3, $4)',
                 [userid, expense.date, expense.accountName, expense.amount]
               );
-            } else {
-              const existingExpenseRecord = existingExpense.rows[0];
-          
-              if (existingExpenseRecord.amount !== expense.amount) {
-                await db.query(
-                  'UPDATE xero_expenses SET amount = $1 WHERE userid = $2 AND date = $3 AND category = $4',
-                  [expense.amount, userid, expense.date, expense.accountName]
-                );
-              }
+            } else if (existingExpense.rows[0].amount !== expense.amount) {
+              await db.query(
+                'UPDATE xero_expenses SET amount = $1 WHERE userid = $2 AND date = $3 AND category = $4',
+                [expense.amount, userid, expense.date, expense.accountName]
+              );
             }
           }
 
           const income = extractXeroIncome(response);
-
           for (const entry of income) {
             const existingIncome = await db.query(
               'SELECT * FROM xero_revenue WHERE userid = $1 AND date = $2 AND category = $3',
               [userid, formattedEndDate, entry.accountName]
             );
-
             if (existingIncome.rowCount === 0) {
               await insertIncome(db, userid, income, formattedEndDate);
-            } else {
-              const existingIncomeRecord = existingIncome.rows[0];
-
-              if (existingIncomeRecord.revenue !== entry.amount) {
-                await db.query(
-                  'UPDATE xero_revenue SET revenue = $1 WHERE userid = $2 AND date = $3 AND category = $4',
-                  [entry.amount, userid, formattedEndDate, entry.accountName]
-                );
-              }
+            } else if (existingIncome.rows[0].revenue !== entry.amount) {
+              await db.query(
+                'UPDATE xero_revenue SET revenue = $1 WHERE userid = $2 AND date = $3 AND category = $4',
+                [entry.amount, userid, formattedEndDate, entry.accountName]
+              );
             }
           }
 
           const costofsales = extractXeroCostOfSales(response);
-
-          for (const entry of costofsales) {
-            const existingCostOfSales = await db.query(
-              'SELECT * FROM xero_costofsales WHERE userid = $1 AND date = $2 AND category = $3',
-              [userid, formattedEndDate, entry.accountName]
-            );
-
-            if (existingCostOfSales.rowCount === 0) {
-              if (costofsales && costofsales.length > 0) {
+          if (costofsales && costofsales.length > 0) {
+            for (const entry of costofsales) {
+              const existingCostOfSales = await db.query(
+                'SELECT * FROM xero_costofsales WHERE userid = $1 AND date = $2 AND category = $3',
+                [userid, formattedEndDate, entry.accountName]
+              );
+              if (existingCostOfSales.rowCount === 0) {
                 await insertCostofSales(db, userid, costofsales, formattedEndDate);
-              }
-            } else {
-              const existingCostOfSalesRecord = existingCostOfSales.rows[0];
-
-              if (existingCostOfSalesRecord.costofsales !== entry.amount) {
+              } else if (existingCostOfSales.rows[0].costofsales !== entry.amount) {
                 await db.query(
                   'UPDATE xero_costofsales SET costofsales = $1 WHERE userid = $2 AND date = $3 AND category = $4',
                   [entry.amount, userid, formattedEndDate, entry.accountName]
@@ -2766,15 +2775,36 @@ app.get('/update_xerodashboard', async (req, res) => {
     }
 
     await db.query('UPDATE user_table SET first_time_insertion = true WHERE userid = $1', [userid]);
-    res.redirect('/xerocompany');
+
+    // Mark extraction as complete
+    extractionStatus.xero[userid] = true;
+
+    // Clean up status after 1 hour to prevent memory leaks
+    setTimeout(() => {
+      delete extractionStatus.xero[userid];
+    }, 60 * 60 * 1000);
 
   } catch (err) {
-    const errorMessage = err.response?.body ? JSON.stringify(err.response.body, null, 2) : err.message;
-    console.log(`Error: ${errorMessage}`);
-    res.status(err.response?.statusCode || 500).send('Failed to get Profit and Loss report');
+    console.error("Error in processXeroData:", err);
+    // Mark as complete even on error to prevent users from being stuck
+    extractionStatus.xero[userid] = true;
   } finally {
-    await closeDb(db);
+    if (db) await closeDb(db);
   }
+}
+
+app.get('/profit', async (req, res) => {
+  if (!req.session.userid) {
+    return res.redirect('/login');
+  }
+  res.redirect('/xero-loading');
+});
+
+app.get('/update_xerodashboard', async (req, res) => {
+  if (!req.session.userid) {
+    return res.redirect('/login');
+  }
+  res.redirect('/xero-loading');
 });
 
 
