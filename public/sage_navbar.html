@@ -1,6 +1,5 @@
-/* Navbar styles with horizontal content */
 <style>
-
+    /* Navbar styles with horizontal content */
 .navbar {
   position: fixed;
   top: 0;
@@ -37,7 +36,7 @@
 
 /* Styling for the Update Dashboard button */
 .update-dashboard-button {
-  background-color: blue;
+  background-color: rgba(0, 255, 21, 0.767);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -47,7 +46,7 @@
 }
 
 .update-dashboard-button:hover {
-  background-color: #0056b3; /* Darker blue on hover */
+  background-color: #33b300; /* Darker blue on hover */
 }
 
 /* Styling for the Logout button */
@@ -100,8 +99,8 @@
   
     <div class="nav-buttons">
       <!-- Update Dashboard Button -->
-      <form action="/quickbooks-loading" method="GET" class="update-dashboard-form">
-        <button class="update-dashboard-button" type="submit" style="background-color: blue; margin-top: 20px;">Update Dashboard</button>
+      <form action="/getProfitandLoss" method="GET" class="update-dashboard-form">
+        <button class="update-dashboard-button" type="submit" style="background-color: rgb(30, 255, 0); margin-top: 20px;">Update Dashboard</button>
       </form>
   
       <!-- Logout Button -->
@@ -110,3 +109,4 @@
       </form>
     </div>
   </div>
+  

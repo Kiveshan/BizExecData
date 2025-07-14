@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sage Login</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* General styling */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Navbar styling */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: white;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .navbar .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .navbar .logo img {
+            height: 50px;
+            margin-right: 10px;
+        }
+
+        .navbar .logo h3 {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00BDD6;
+            margin: 0;
+        }
+
+        .navbar .nav-links {
+            list-style: none;
+            display: flex;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar .nav-links li {
+            margin-left: 20px;
+        }
+
+        .navbar .nav-links li a {
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 10px 20px;
+            background-color: #00BDD6;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .navbar .nav-links li a:hover {
+            background-color: #009bb0;
+        }
+
+        /* Center the form container */
+        .form-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 90vh;
+            flex-direction: column;
+        }
+
+        form {
+            background-color: #f7f7f7;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        form h1 {
+            font-size: 24px;
+            color: #00BDD6;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        form h2 {
+            font-size: 16px;
+            color: gray;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Styling for the form fields */
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* Login button */
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #00BDD6;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        button:hover {
+            background-color: #009bb0;
+        }
+
+        /* Register link styling */
+        p {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: gray;
+        }
+
+        p a {
+            color: #00BDD6;
+            text-decoration: none;
+        }
+
+        p a:hover {
+            text-decoration: underline;
+        }
+
+        /* Error message styling */
+        .error-message {
+            color: red;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        /* Modal/Popup styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            color: #00BDD6;
+            margin-top: 0;
+        }
+
+        .modal-text {
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .modal-button-cancel {
+            background-color: #f1f1f1;
+            color: #333;
+        }
+
+        .modal-button-confirm {
+            background-color: #00BDD6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="logo">
+                <a href="/index">
+                    <img src="logo_biz.png" alt="Navbar Logo">
+                </a>
+                <h3>Business Executive Data</h3>
+            </div>
+        </nav>
+    </header>
+
+    <div class="form-container">
+        <form id="loginForm" action="/sagelogin" method="post">
+            <h1>Login to your account</h1>
+            <h2>Enter your Sage credentials to access your account</h2>
+
+            <% if (typeof error !== 'undefined') { %>
+                <div class="error-message">
+                    <%= error %>
+                </div>
+            <% } %>
+
+            <input type="email" name="email" id="email" placeholder="Email" required>
+            <input type="password" name="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+            <input type="hidden" name="confirmed" id="confirmed" value="false">
+        </form>
+    </div>
+
+    <!-- Registration Confirmation Modal -->
+    <div id="registrationModal" class="modal">
+        <div class="modal-content">
+            <h3 class="modal-title">New Account Registration</h3>
+            <p class="modal-text">
+                We don't have an account with these credentials yet. If you continue:
+                <ul>
+                    <li>We'll create a new account using your Sage credentials</li>
+                    <li>We'll connect to your Sage account to retrieve your company information</li>
+                    <li>Your financial data will be imported for analysis</li>
+                </ul>
+                Would you like to proceed with registration?
+            </p>
+            <div class="modal-buttons">
+                <button id="cancelRegistration" class="modal-button modal-button-cancel">Cancel</button>
+                <button id="confirmRegistration" class="modal-button modal-button-confirm">Yes, Register</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            const registrationModal = document.getElementById('registrationModal');
+            const confirmRegistration = document.getElementById('confirmRegistration');
+            const cancelRegistration = document.getElementById('cancelRegistration');
+            const confirmedInput = document.getElementById('confirmed');
+            
+            // Store form data for later use
+            let formData = null;
+
+            loginForm.addEventListener('submit', async function(e) {
+                // Only check for existing user if not already confirmed
+                if (confirmedInput.value !== 'true') {
+                    e.preventDefault();
+                    
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    
+                    // Store the form data
+                    formData = {
+                        email: email,
+                        password: password
+                    };
+                    
+                    try {
+                        // Check if user exists
+                        const response = await fetch('/check-user-exists', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ email: email })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!data.exists) {
+                            // User doesn't exist, show registration confirmation
+                            registrationModal.style.display = 'block';
+                        } else {
+                            // User exists, continue with normal login
+                            loginForm.submit();
+                        }
+                    } catch (error) {
+                        console.error('Error checking if user exists:', error);
+                        // If there's an error, just submit the form normally
+                        loginForm.submit();
+                    }
+                }
+            });
+            
+            // Handle confirmation button click
+            confirmRegistration.addEventListener('click', function() {
+                confirmedInput.value = 'true';
+                registrationModal.style.display = 'none';
+                loginForm.submit();
+            });
+            
+            // Handle cancel button click
+            cancelRegistration.addEventListener('click', function() {
+                registrationModal.style.display = 'none';
+            });
+            
+            // Close modal if user clicks outside of it
+            window.addEventListener('click', function(event) {
+                if (event.target === registrationModal) {
+                    registrationModal.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
