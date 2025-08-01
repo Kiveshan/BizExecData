@@ -2922,7 +2922,7 @@ async function processXeroData(userid) {
         );
 
         if (response.body.reports && response.body.reports.length > 0) {
-          const summaryData = extractXeroSummaryData(response);
+          const summaryData = extractXeroSummaryData(response.body);
 
           if (summaryData.grossProfit == 0.0 && summaryData.netProfit == 0.0) {
             console.log(`Skipping ${year}-${month} as all values are 0.`);
@@ -2965,7 +2965,7 @@ async function processXeroData(userid) {
             }
           }
 
-          const expenses = extractXeroExpenses(response, formattedEndDate);
+          const expenses = extractXeroExpenses(response.body, formattedEndDate);
           for (const expense of expenses) {
             const existingExpense = await db.query(
               "SELECT * FROM xero_expenses WHERE userid = $1 AND date = $2 AND category = $3",
@@ -2984,7 +2984,7 @@ async function processXeroData(userid) {
             }
           }
 
-          const income = extractXeroIncome(response);
+          const income = extractXeroIncome(response.body);
           for (const entry of income) {
             const existingIncome = await db.query(
               "SELECT * FROM xero_revenue WHERE userid = $1 AND date = $2 AND category = $3",
@@ -3000,7 +3000,7 @@ async function processXeroData(userid) {
             }
           }
 
-          const costofsales = extractXeroCostOfSales(response);
+          const costofsales = extractXeroCostOfSales(response.body);
           if (costofsales && costofsales.length > 0) {
             for (const entry of costofsales) {
               const existingCostOfSales = await db.query(
@@ -3218,7 +3218,6 @@ const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "REDACTED";
 
 import fetch from "node-fetch";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Helper function to format a Date object as YYYY-MM-DD string
