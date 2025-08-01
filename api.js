@@ -3218,7 +3218,6 @@ const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "REDACTED";
 
 import fetch from "node-fetch";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Helper function to format a Date object as YYYY-MM-DD string
