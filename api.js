@@ -12,14 +12,12 @@ import methodOverride from "method-override";
 import passport from "passport";
 import initializePassport from "./passport-config.js";
 import { hash, compare } from "bcrypt";
-import { execSync } from "child_process";
 import jsonpath from "jsonpath";
 import _ from "lodash";
 import fileUpload from "express-fileupload"; // New library for file upload
 import xlsx from "xlsx";
 import fs from "fs";
 import { XeroClient } from "xero-node";
-import axios from "axios";
 
 // Initialize express and dotenv
 dotenv.config();
@@ -793,8 +791,10 @@ The response for API call is: ${JSON.stringify(authResponse.json)}`);
 app.get("/update", async (req, res) => {
   const userid = req.session.userid;
   const companyID = oauthClient.getToken().realmId;
-  const startDate = "2024-01-01";
   const currentDate = new Date();
+  const oneYearAgo = currentDate.getFullYear() - 1;
+  const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`; // Start from the first day of the month one year ago
+  console.log(`Start Date: ${startDate}`);
   let date = new Date(startDate);
 
   function formatDate(date) {
@@ -1352,8 +1352,10 @@ app.get("/check-quickbooks-extraction", (req, res) => {
 // Process QuickBooks data in the background
 async function processQuickBooksData(userid) {
   try {
-    const startDate = "2024-01-01";
     const currentDate = new Date();
+    const oneYearAgo = currentDate.getFullYear() - 1;
+    const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`; // Start from the first day of the month one year ago
+    console.log(`Start Date: ${startDate}`);
     const date = new Date(startDate);
     const companyID = oauthClient.getToken().realmId;
 
@@ -2896,7 +2898,7 @@ async function processXeroData(userid) {
     }
 
     const tenantId = xero.tenants[0].tenantId;
-    const startYear = 2023;
+    const startYear = 2024;
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
