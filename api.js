@@ -3559,8 +3559,6 @@ app.post("/sagelogin", async (req, res) => {
     // Hash the password for secure database storage
     const saltRounds = 10;
     const hashedPassword = await hash(password, saltRounds);
-    console.log(hashedPassword);
-    console.log(companyData.companyData.ID);
 
     // Combine company address fields
     const full_address =
@@ -3697,13 +3695,6 @@ async function makeProfitApiCall(
     throw error;
   }
 }
-
-/**
- * Test route for Sage API
- */
-app.get("/sagetest", async (req, res) => {
-  res.render("sagetest");
-});
 
 /**
  * Generates date ranges for each month from a start date to the current month
