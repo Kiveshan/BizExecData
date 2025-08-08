@@ -18,6 +18,7 @@ import fileUpload from "express-fileupload"; // New library for file upload
 import xlsx from "xlsx";
 import fs from "fs";
 import { XeroClient } from "xero-node";
+import crypto from "crypto"; // Import the crypto module
 
 // Initialize express and dotenv
 dotenv.config();
@@ -26,6 +27,39 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.set("view engine", "ejs");
+
+// --- START: Password Encryption Setup ---
+// Ensure these environment variables are set for production!
+const ENCRYPTION_KEY =
+  process.env.ENCRYPTION_KEY || "a_very_secret_key_of_32_chars_for_aes256"; // Must be 32 bytes (256 bits)
+const IV_LENGTH = 16; // For AES-256-CBC
+
+function encrypt(text) {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY),
+    iv
+  );
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
+}
+
+function decrypt(text) {
+  const textParts = text.split(":");
+  const iv = Buffer.from(textParts.shift(), "hex");
+  const encryptedText = Buffer.from(textParts.join(":"), "hex");
+  const decipher = crypto.createDecipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY),
+    iv
+  );
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
+// --- END: Password Encryption Setup ---
 
 // PostgreSQL connection settings
 async function connectDb() {
@@ -1882,11 +1916,11 @@ app.get("/api/exprofit", async (req, res) => {
              SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit,
              SUM(CASE WHEN subcategory = 'Total expenses' THEN amount ELSE 0 END) AS expenses,
              SUM(CASE WHEN subcategory = 'Total other income' THEN amount ELSE 0 END) AS otherincome
-      FROM excel_companydata 
-      WHERE category = 'TOTAL' and userid = $1
-      GROUP BY DATE(date)
-      ORDER BY DATE(date);
-    `,
+     FROM excel_companydata 
+     WHERE category = 'TOTAL' and userid = $1
+     GROUP BY DATE(date)
+     ORDER BY DATE(date);
+   `,
       [userid]
     );
 
@@ -2242,7 +2276,7 @@ async function processFinancialData(data, req, formattedDate) {
         // Insert the data into the database
         const insertQuery = {
           text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                         VALUES ($1, $2, $3, $4, $5)`,
+                        VALUES ($1, $2, $3, $4, $5)`,
           values: [userid, category, subcategory, amount, formattedDate],
         };
 
@@ -2474,8 +2508,8 @@ async function amendFinancialData(data, req, formattedDate, fullDate) {
           // Update the existing record
           const updateQuery = {
             text: `UPDATE excel_companydata 
-                               SET amount = $1, date = $5 
-                               WHERE userid = $2 AND category = $3 AND subcategory = $4 AND date::TEXT LIKE $6`,
+                              SET amount = $1, date = $5 
+                              WHERE userid = $2 AND category = $3 AND subcategory = $4 AND date::TEXT LIKE $6`,
             values: [
               amount,
               userid,
@@ -2491,7 +2525,7 @@ async function amendFinancialData(data, req, formattedDate, fullDate) {
           // Insert a new record if no existing record is found
           const insertQuery = {
             text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                               VALUES ($1, $2, $3, $4, $5)`,
+                              VALUES ($1, $2, $3, $4, $5)`,
             values: [userid, category, subcategory, amount, fullDate],
           };
 
@@ -3228,7 +3262,6 @@ import fetch from "node-fetch";
  * @param {Date} date - The date to format
  * @returns {string} Formatted date string in YYYY-MM-DD format
  *
-
 /**
  * Validates Sage credentials by making API calls to Sage
  * Performs a two-step validation:
@@ -3495,7 +3528,8 @@ app.post("/sagelogin", async (req, res) => {
           userid: user.userid,
           companyid: user.sage_company_id,
           email: user.email,
-          password: password, // Store the plain password for API calls (consider encryption in production)
+          // Store the encrypted password in the session
+          password: encrypt(password),
         };
 
         // If first time login, redirect to data extraction page
@@ -3559,8 +3593,6 @@ app.post("/sagelogin", async (req, res) => {
     // Hash the password for secure database storage
     const saltRounds = 10;
     const hashedPassword = await hash(password, saltRounds);
-    console.log(hashedPassword);
-    console.log(companyData.companyData.ID);
 
     // Combine company address fields
     const full_address =
@@ -3613,7 +3645,8 @@ app.post("/sagelogin", async (req, res) => {
     req.session.user = {
       id: newUser.id,
       email: email,
-      password: password, // Store the plain password for API calls (consider encryption in production)
+      // Store the encrypted password in the session
+      password: encrypt(password),
       companyId: newUser.company_id,
       companyName: companyData.companyData.Name,
     };
@@ -3697,13 +3730,6 @@ async function makeProfitApiCall(
     throw error;
   }
 }
-
-/**
- * Test route for Sage API
- */
-app.get("/sagetest", async (req, res) => {
-  res.render("sagetest");
-});
 
 /**
  * Generates date ranges for each month from a start date to the current month
@@ -3838,11 +3864,15 @@ async function processMonthlyData(
   dateRanges,
   companyid,
   email,
-  password
+  encryptedPassword
 ) {
+  // Changed parameter name to encryptedPassword
   try {
     // Set initial status to false (not complete)
     extractionStatus.sage[userid] = false;
+
+    // Decrypt the password once at the start of the process
+    const password = decrypt(encryptedPassword);
 
     // Process each month sequentially
     for (let i = 0; i < dateRanges.length; i++) {
@@ -3859,7 +3889,7 @@ async function processMonthlyData(
           range.startDate,
           range.endDate,
           email,
-          password
+          password // Pass the decrypted password
         );
 
         // Use the last day of the month as the date for the database records
@@ -3955,13 +3985,13 @@ app.post("/start-profit-loss-process", async (req, res) => {
     const companyid = req.session.user.companyid;
     const userid = req.session.user.userid;
     const email = req.session.user.email;
-    const password = req.session.user.password;
+    const encryptedPassword = req.session.user.password; // Retrieve the encrypted password
 
     // Generate date ranges for each month from Jan 2024 to now
     const dateRanges = generateMonthlyDateRanges(2024, 0);
 
     // Start the processing in the background
-    processMonthlyData(userid, dateRanges, companyid, email, password);
+    processMonthlyData(userid, dateRanges, companyid, email, encryptedPassword); // Pass encrypted password
 
     // Return success
     res.json({
@@ -4283,14 +4313,14 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
       // Update existing record
       await db.query(
         `
-        UPDATE sage_company_calcs SET 
-          grossprofit = $1, 
-          opexpenses = $2, 
-          netprofit = $3, 
-          sumofsales = $4, 
-          sumofcost = $5
-        WHERE userid = $6 AND date = $7
-      `,
+       UPDATE sage_company_calcs SET 
+         grossprofit = $1, 
+         opexpenses = $2, 
+         netprofit = $3, 
+         sumofsales = $4, 
+         sumofcost = $5
+       WHERE userid = $6 AND date = $7
+     `,
         [
           grossProfit,
           totalExpenses,
@@ -4305,12 +4335,12 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
       // Insert new record
       await db.query(
         `
-        INSERT INTO sage_company_calcs (
-          userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7
-        )
-      `,
+       INSERT INTO sage_company_calcs (
+         userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7
+       )
+     `,
         [
           userid,
           grossProfit,
