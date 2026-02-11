@@ -30,8 +30,12 @@ app.set("view engine", "ejs");
 
 // --- START: Password Encryption Setup ---
 // Ensure these environment variables are set for production!
-const ENCRYPTION_KEY =
-  process.env.ENCRYPTION_KEY || "a_very_secret_key_of_32_chars_for_aes256"; // Must be 32 bytes (256 bits)
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Must be 32 bytes (256 bits)
+if (!ENCRYPTION_KEY || Buffer.from(ENCRYPTION_KEY).length !== 32) {
+  throw new Error(
+    "ENCRYPTION_KEY must be set and 32 bytes long for AES-256-CBC encryption"
+  );
+}
 const IV_LENGTH = 16; // For AES-256-CBC
 
 function encrypt(text) {
@@ -63,13 +67,28 @@ function decrypt(text) {
 
 // PostgreSQL connection settings
 async function connectDb() {
+  const {
+    RDS_USERNAME,
+    RDS_HOSTNAME,
+    RDS_DB_NAME,
+    RDS_PASSWORD,
+    RDS_PORT,
+    DB_SSL,
+  } = process.env;
+
+  if (!RDS_USERNAME || !RDS_HOSTNAME || !RDS_DB_NAME || !RDS_PASSWORD) {
+    throw new Error(
+      "Database environment variables RDS_USERNAME, RDS_HOSTNAME, RDS_DB_NAME, and RDS_PASSWORD must be set"
+    );
+  }
+
   const db = new pg.Client({
-    user: process.env.RDS_USERNAME || "postgres",
-    host: process.env.RDS_HOSTNAME || "localhost",
-    database: process.env.RDS_DB_NAME || "BizExecData",
-    password: process.env.RDS_PASSWORD || "123456",
-    port: process.env.RDS_PORT || 5433,
-    ssl: process.env.DB_SSL ? { rejectUnauthorized: false } : false,
+    user: RDS_USERNAME,
+    host: RDS_HOSTNAME,
+    database: RDS_DB_NAME,
+    password: RDS_PASSWORD,
+    port: RDS_PORT ? Number(RDS_PORT) : 5432,
+    ssl: DB_SSL ? { rejectUnauthorized: false } : false,
   });
   await db.connect();
   return db;
@@ -90,27 +109,26 @@ initializePassport(passport);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 app.use(flash());
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be set in environment variables");
+}
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
   })
 );
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(methodOverride("_method"));
-
-const authenticateToken = (req, res, next) => {
-  const token = req.headers["authorization"];
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-};
 
 // Middleware to check if the user is an admin
 const isAdmin = (req, res, next) => {
