@@ -1,0 +1,7 @@
+export const ROLES = {
+  COMPANY_USER: 1,
+  COMPANY_USER_ALT: 2,
+  ADMIN: 3,
+  EXCEL_USER: 4,
+  SUPER_ADMIN: 10,
+};

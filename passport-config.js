@@ -1,6 +1,6 @@
 import { Strategy as LocalStrategy } from 'passport-local';
- import bcrypt from 'bcrypt';
- import { findUserByEmail, findUserById } from './api.js';
+import bcrypt from 'bcrypt';
+import { findUserByEmail, findUserById } from './user-service.js';
 
 async function initialize(passport) {
   const authenticateUser = async (email, password, done) => {
@@ -41,51 +41,4 @@ async function initialize(passport) {
     }
   });
 }
-
-export async function createUser(email, password) {
-  const domain = email.split('@')[1]; 
-
-  let roleId;
-  switch (domain) {
-      case 1:
-        res.redirect('/');
-        break;
-      case 2:
-          res.redirect('/');
-          break;
-      case 3:
-        res.redirect('/adminmenu');
-        break;
-        default:
-        res.redirect('/login');
-      break;
-  }
- const hashedPassword = await hash(password, 10);
- 
-  await insertUserWithRoleId( email, roleId, hashedPassword);
-}
-
-async function insertUserWithRoleId(email, roleId, hashedPassword) {
-  const db = await connectDb();
-  try {
-    
-    const query = {
-      text: `
-        INSERT INTO user_table(email, roleid, password)
-        VALUES($1, $2, $3)
-        RETURNING *
-      `,
-      values: [ email, roleId, hashedPassword],
-    };
-    const result = await db.query(query);
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error inserting user with role ID:', error);
-    throw error;
-  } finally {
-    await closeDb(db); 
-  }
-}
-
-
 export default initialize;

@@ -19,6 +19,11 @@ import xlsx from "xlsx";
 import fs from "fs";
 import { XeroClient } from "xero-node";
 import crypto from "crypto"; // Import the crypto module
+import fetch from "node-fetch";
+import { connectDb, closeDb } from "./db.js";
+import { findUserByEmail, findRoleIdByRoleName } from "./user-service.js";
+import { ROLES } from "./roles.js";
+import { login as authLogin, logout as authLogout, register as authRegister } from "./controllers/authController.js";
 
 // Initialize express and dotenv
 dotenv.config();
@@ -65,39 +70,6 @@ function decrypt(text) {
 }
 // --- END: Password Encryption Setup ---
 
-// PostgreSQL connection settings
-async function connectDb() {
-  const {
-    RDS_USERNAME,
-    RDS_HOSTNAME,
-    RDS_DB_NAME,
-    RDS_PASSWORD,
-    RDS_PORT,
-    DB_SSL,
-  } = process.env;
-
-  if (!RDS_USERNAME || !RDS_HOSTNAME || !RDS_DB_NAME || !RDS_PASSWORD) {
-    throw new Error(
-      "Database environment variables RDS_USERNAME, RDS_HOSTNAME, RDS_DB_NAME, and RDS_PASSWORD must be set"
-    );
-  }
-
-  const db = new pg.Client({
-    user: RDS_USERNAME,
-    host: RDS_HOSTNAME,
-    database: RDS_DB_NAME,
-    password: RDS_PASSWORD,
-    port: RDS_PORT ? Number(RDS_PORT) : 5432,
-    ssl: DB_SSL ? { rejectUnauthorized: false } : false,
-  });
-  await db.connect();
-  return db;
-}
-
-async function closeDb(db) {
-  await db.end();
-}
-
 dotenv.config();
 
 // Static files middleware
@@ -132,7 +104,9 @@ app.use(methodOverride("_method"));
 
 // Middleware to check if the user is an admin
 const isAdmin = (req, res, next) => {
-  if (req.user.roleid !== 10) return res.sendStatus(403);
+  if (req.user.roleid !== ROLES.SUPER_ADMIN && req.user.roleid !== ROLES.ADMIN) {
+    return res.sendStatus(403);
+  }
   next();
 };
 
@@ -157,176 +131,18 @@ function checkNotAuthenticated(req, res, next) {
   next();
 }
 
-// Define the registration route
-app.post("/register1", async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    if (!email || !password) {
-      throw new Error("Email and password are required");
-    }
-    const user = await createUser({ email, password });
-    res.redirect("/login");
-  } catch (error) {
-    console.error("Registration error:", error);
-    res
-      .status(400)
-      .send(
-        `<html><body><h1>Error: ${error.message}</h1><p>Please go back and try again.</p></body></html>`
-      );
-  }
-});
-
-// Login Function
-async function login(req, res, next) {
-  const db = await connectDb();
-
-  passport.authenticate("local", async (err, user, info) => {
-    try {
-      if (err || !user) {
-        return res.render("login", {
-          error: "Account does not exsist please register",
-        });
-      }
-
-      // Assuming you have a function that retrieves a user by their email
-      const loggedInUser = await findUserByEmail(user.email);
-
-      const exsistingLicense = await db.query(
-        `SELECT * FROM license_management WHERE userid = $1`,
-        [user.userid]
-      );
-
-      // Check if the user is an admin
-      if (loggedInUser.roleid === 3) {
-        // Admin users bypass the status and licensing checks
-        req.login(user, async (err) => {
-          if (err) {
-            return next(err);
-          }
-
-          // Store user info in session for admins
-          req.session.roleid = loggedInUser.roleid;
-          req.session.userid = loggedInUser.userid;
-
-          return res.redirect("/dashboard"); // Redirect to the dashboard
-        });
-      } else {
-        // Regular users need to go through the checks
-        // Check if the user's status is approved
-        if (loggedInUser.status !== "approved") {
-          return res.render("login", {
-            error: "Please wait for our admin to approve you.",
-          });
-        }
-
-        // Check if the existing license is paid
-        if (
-          exsistingLicense.rows.length === 0 ||
-          exsistingLicense.rows[0].status !== "Paid"
-        ) {
-          return res.render("login", {
-            error: "Please ensure you purchase licensing for the software.",
-          });
-        }
-
-        req.login(user, async (err) => {
-          if (err) {
-            return next(err);
-          }
-
-          // Store user info in session for regular users
-          req.session.roleid = loggedInUser.roleid;
-          req.session.userid = loggedInUser.userid;
-
-          return res.redirect("/dashboard"); // Redirect to the dashboard
-        });
-      }
-    } catch (error) {
-      return next(error);
-    } finally {
-      await closeDb(db); // Ensure the connection is closed
-    }
-  })(req, res, next);
-}
-
-// Logout Function
-async function logout(req, res) {
-  req.logout(function (err) {
-    if (err) {
-      console.error("Error logging out:", err);
-      res.status(500).send("Internal Server Error");
-      return;
-    }
-    res.redirect("/index");
-  });
-}
-
-export async function findUserByEmail(email) {
-  const db = await connectDb();
-  try {
-    const query = {
-      text: "SELECT * FROM user_table WHERE email = $1",
-      values: [email],
-    };
-    const result = await db.query(query);
-    return result.rows[0];
-  } catch (error) {
-    console.error("Error finding user by email:", error);
-    throw error;
-  } finally {
-    await closeDb(db);
-  }
-}
-
-export async function findUserById(userid) {
-  const db = await connectDb();
-  try {
-    const query = {
-      text: "SELECT * FROM user_table WHERE userid = $1",
-      values: [userid],
-    };
-    const result = await db.query(query);
-    return result.rows[0];
-  } catch (error) {
-    console.error("Error finding user by userid:", error);
-    throw error;
-  } finally {
-    await closeDb(db);
-  }
-}
-
-export async function findRoleIdByRoleName(rolename) {
-  const db = await connectDb();
-  try {
-    const query = {
-      text: "SELECT roleid FROM roles WHERE rolename = $1",
-      values: [rolename],
-    };
-    const result = await db.query(query);
-    return result.rows[0]?.roleid;
-  } catch (error) {
-    console.error("Error finding role by rolename:", error);
-    throw error;
-  } finally {
-    await closeDb(db);
-  }
-}
-
 // Generic dashboard route to handle different roles
 app.get("/dashboard", checkAuthenticated, async (req, res) => {
   const roleId = req.session.roleid;
   switch (roleId) {
-    case 1:
+    case ROLES.COMPANY_USER:
+    case ROLES.COMPANY_USER_ALT:
       res.redirect("/company");
       break;
-    case 2:
-      res.redirect("/company");
-      break;
-    case 3:
+    case ROLES.ADMIN:
       res.redirect("/adminmenu");
       break;
-    case 4:
+    case ROLES.EXCEL_USER:
       res.redirect("/excel_dashboard");
       break;
     default:
@@ -336,10 +152,6 @@ app.get("/dashboard", checkAuthenticated, async (req, res) => {
 
 app.get("/login", checkNotAuthenticated, (req, res) => {
   res.render("login.ejs");
-});
-
-app.get("/register1", checkNotAuthenticated, (req, res) => {
-  res.render("register1.ejs");
 });
 
 app.get("/forgot-password", checkNotAuthenticated, (req, res) => {
@@ -500,9 +312,9 @@ app.get("/approved-users", async (req, res) => {
 });
 
 // Authentication
-app.post("/login", checkNotAuthenticated, login);
+app.post("/login", checkNotAuthenticated, authLogin);
 
-app.delete("/logout", logout);
+app.delete("/logout", authLogout);
 
 app.get("/adminmenu", checkAuthenticated, (req, res) => {
   res.render("adminmenu.ejs");
@@ -582,97 +394,7 @@ app.get("/licensemgt", checkAuthenticated, async (req, res) => {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.post("/register", async (req, res) => {
-  const curentDate = new Date();
-  const {
-    firstname,
-    surname,
-    company_name,
-    email,
-    address,
-    telephone,
-    password,
-    accounting_software,
-    company_services,
-    clientid,
-    clientsecret,
-    redirecturl,
-  } = req.body;
-
-  const db = await connectDb();
-
-  try {
-    // Ensure required fields are present
-    if (!email || !password || !firstname || !surname) {
-      throw new Error("Firstname, surname, email, and password are required");
-    }
-
-    // Connect to the database
-
-    // Check if email already exists
-    const emailCheck = await db.query(
-      "SELECT email FROM user_table WHERE email = $1",
-      [email]
-    );
-
-    if (emailCheck.rows.length > 0) {
-      throw new Error("Email is already in use");
-    }
-
-    let roleId = 0;
-
-    // Hash the password
-    const hashedPassword = await hash(password, 10);
-    if (accounting_software == "excel") {
-      roleId = 4;
-    } else {
-      roleId = 1;
-    }
-
-    // Insert user into the database
-    const insertQuery = `
-      INSERT INTO user_table (
-        firstname, surname, company_name, email, address, telephone, password, accounting_software, company_services, roleid, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,'pending') RETURNING userid
-    `;
-
-    const values = [
-      firstname,
-      surname,
-      company_name,
-      email,
-      address,
-      telephone,
-      hashedPassword,
-      accounting_software,
-      company_services,
-      roleId,
-    ];
-
-    const result = await db.query(insertQuery, values);
-    const userId = result.rows[0].userid;
-
-    await db.query(
-      `INSERT INTO license_management (owner_name,company_name,status,date_submitted,userid)
-      VALUES ($1,$2,'Pending',$3,$4)`,
-      [firstname + " " + surname, company_name, curentDate, userId]
-    );
-
-    // Registration successful, redirect to login page
-
-    res.redirect("/login");
-  } catch (error) {
-    console.error("Registration error:", error);
-    // Display error message in HTML format
-    res
-      .status(400)
-      .send(
-        `<html><body><h1>Error: ${error.message}</h1><p>Please go back and try again.</p></body></html>`
-      );
-  } finally {
-    await closeDb(db); // Ensure the connection is closed
-  }
-});
+app.post("/register", authRegister);
 
 //module 0 ends here
 
@@ -3271,15 +2993,14 @@ app.get("/api/xerocostofsales", async (req, res) => {
 const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "REDACTED";
 
-import fetch from "node-fetch";
-
 /**
  * Helper function to format a Date object as YYYY-MM-DD string
  * Used for API requests and database operations that require date strings
  * 
  * @param {Date} date - The date to format
  * @returns {string} Formatted date string in YYYY-MM-DD format
- *
+ */
+
 /**
  * Validates Sage credentials by making API calls to Sage
  * Performs a two-step validation:
