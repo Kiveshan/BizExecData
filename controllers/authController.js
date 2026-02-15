@@ -11,7 +11,8 @@ export async function login(req, res, next) {
     try {
       if (err || !user) {
         return res.render("login", {
-          error: "Account does exsist please register",
+          error:
+            "Incorrect email or password. Please try again or register an account.",
         });
       }
 
@@ -36,7 +37,8 @@ export async function login(req, res, next) {
       } else {
         if (loggedInUser.status !== "approved") {
           return res.render("login", {
-            error: "Please wait for our admin to approve you.",
+            error:
+              "Your account is not yet approved. Please wait for an administrator to approve your registration.",
           });
         }
 
@@ -45,7 +47,8 @@ export async function login(req, res, next) {
           exsistingLicense.rows[0].status !== "Paid"
         ) {
           return res.render("login", {
-            error: "Please ensure you purchase licensing for the software.",
+            error:
+              "Your license is not active. Please purchase or renew your license to continue.",
           });
         }
 
@@ -158,11 +161,10 @@ export async function register(req, res) {
     res.redirect("/login");
   } catch (error) {
     console.error("Registration error:", error);
-    res
-      .status(400)
-      .send(
-        `<html><body><h1>Error: ${error.message}</h1><p>Please go back and try again.</p></body></html>`
-      );
+    res.status(400).render("register.ejs", {
+      error: error.message,
+      formData: req.body,
+    });
   } finally {
     await closeDb(db);
   }

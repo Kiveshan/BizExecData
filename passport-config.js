@@ -24,14 +24,18 @@ async function initialize(passport) {
   passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser));
 
   passport.serializeUser((user, done) => {
-    done(null, { userid: user.userid, role: user.role });
+    // Persist only the minimal data needed to rehydrate the user
+    done(null, { userid: user.userid, roleid: user.roleid });
   });
   
-  passport.deserializeUser(async ({ userid, role }, done) => {
+  passport.deserializeUser(async ({ userid, roleid }, done) => {
     try {
       const user = await findUserById(userid);
       if (user) {
-        user.role = role; // Set the role from the session
+        // Prefer the roleid from the DB but fall back to the serialized value if needed
+        if (roleid != null) {
+          user.roleid = roleid;
+        }
         done(null, user);
       } else {
         done(new Error('User not found'));
