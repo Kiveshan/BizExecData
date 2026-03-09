@@ -24,19 +24,6 @@ import { connectDb, closeDb } from "./db.js";
 import { findUserByEmail, findRoleIdByRoleName } from "./user-service.js";
 import { ROLES } from "./roles.js";
 import { login as authLogin, logout as authLogout, register as authRegister } from "./controllers/authController.js";
-import {
-  listLicenses,
-  renewLicense,
-  deactivateLicense,
-} from "./controllers/licenseController.js";
-import {
-  getAdminDashboard,
-  previewUser,
-  approveUser,
-  rejectUser,
-  listCompanyApplications,
-  getCompanyRegDetails,
-} from "./controllers/adminController.js";
 
 // Initialize express and dotenv
 dotenv.config();
@@ -175,21 +162,140 @@ app.get("/StudentDashboard", checkAuthenticated, (req, res) => {
   res.render("newstudentdash.ejs");
 });
 
-app.get("/adminDashboard", checkAuthenticated, isAdmin, getAdminDashboard);
+app.get("/adminDashboard", checkAuthenticated, isAdmin, async (req, res) => {
+  const db = await connectDb();
+  try {
+    const result = await db.query("SELECT * FROM user_profile");
+    const users = result.rows;
+
+    // Fetch user profile data
+    const usersResult = await db.query("SELECT * FROM user_table");
+    const userData = usersResult.rows;
+    res.render("adminDashboard", { userData, users, user: req.user });
+  } catch (error) {
+    console.error("Error fetching profiles:", error);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    await closeDb(db);
+  }
+});
+
+//New roleid update function
+async function updateUserRole(userid, chosen_role) {
+  const db = await connectDb();
+
+  try {
+    const roleQuery = {
+      text: `
+        UPDATE user_table
+        SET roleid = r.roleid
+        FROM roles r
+        WHERE user_table.userid = $1
+        AND r.rolename = $2;
+      `,
+      values: [userid, chosen_role],
+    };
+
+    await db.query(roleQuery);
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    throw error;
+  } finally {
+    await closeDb(db);
+  }
+}
 
 // Routing for previewing the user
-app.get("/admin/previewUser/:userprofileid", checkAuthenticated, previewUser);
+app.get(
+  "/admin/previewUser/:userprofileid",
+  checkAuthenticated,
+  async (req, res) => {
+    const { userprofileid } = req.params;
+    const db = await connectDb();
+
+    try {
+      const userResult = await db.query(
+        "SELECT * FROM user_profile WHERE userprofileid = $1",
+        [userprofileid]
+      );
+      const user = userResult.rows[0];
+      await closeDb(db);
+      res.render("previewUser", { user });
+    } catch (err) {
+      await closeDb(db);
+      console.error("Error fetching user details", err);
+      res.status(500).send("Error fetching user details");
+    }
+  }
+);
 
 app.post(
   "/companyregdetails/approveUser/:id",
   checkAuthenticated,
-  approveUser
+  async (req, res) => {
+    const { id } = req.params;
+    const adminid = req.user.userid; // Assuming the admin's userid is available in the session
+    const db = await connectDb();
+
+    try {
+      // Fetch user details from user_profile
+      const userResult = await db.query(
+        "SELECT * FROM user_table WHERE userid = $1",
+        [id]
+      );
+      const user = userResult.rows[0];
+
+      if (user) {
+        // // Insert user details into adminreview_table with status 'approved'
+        // await db.query(
+        //   'INSERT INTO adminreview_table (userid, adminid, status, comments, comment_length) VALUES ($1, $2, $3, $4, $5)',
+        //   [user.userid, adminid, 'approved', '', 0]
+        // );
+
+        // Update status to 'approved' only if it's not already approved
+        if (user.status !== "approved") {
+          await db.query(
+            "UPDATE user_table SET status = $1 WHERE userid = $2",
+            ["approved", id]
+          );
+
+          // Update user role based on chosen_role
+          // await updateUserRole(user.userid, user.chosen_role);
+        }
+
+        console.log(`User profile with ID ${id} approved and roles updated.`);
+      }
+
+      await closeDb(db);
+      res.redirect("/adminmenu");
+    } catch (err) {
+      await closeDb(db);
+      console.error("Error approving user", err);
+      res.status(500).send("Error approving user");
+    }
+  }
 );
 
 app.post(
   "/companyregdetails/rejectUser/:id",
   checkAuthenticated,
-  rejectUser
+  async (req, res) => {
+    const { id } = req.params;
+    const db = await connectDb();
+
+    try {
+      await db.query("UPDATE user_table SET status = $1 WHERE userid = $2", [
+        "rejected",
+        id,
+      ]);
+      await closeDb(db);
+      res.redirect("/adminmenu");
+    } catch (err) {
+      await closeDb(db);
+      console.error("Error rejecting user", err);
+      res.status(500).send("Error rejecting user");
+    }
+  }
 );
 
 // Route to get all approved users
@@ -222,15 +328,67 @@ app.get("/homepage", checkNotAuthenticated, (req, res) => {
   res.render("homepage.ejs");
 });
 
-app.get("/companyregapplications", checkAuthenticated, listCompanyApplications);
+app.get("/companyregapplications", async (req, res) => {
+  const db = await connectDb();
+  try {
+    // Fetch data from the applications table
+    const applicationsResult = await db.query("SELECT * FROM user_table");
+    const applications = applicationsResult.rows;
+
+    // Render the page with the applications, users, and statuses data
+    res.render("companyregapplications", { applications });
+  } catch (err) {
+    console.error("Error executing query", err);
+    res.status(500).send("Error retrieving data from database");
+  } finally {
+    await closeDb(db); // Ensure the connection is closed
+  }
+});
 
 app.get("/register", checkNotAuthenticated, (req, res) => {
   res.render("register.ejs");
 });
 
-app.get("/companyregdetails/:id", checkAuthenticated, getCompanyRegDetails);
+app.get("/companyregdetails/:id", checkAuthenticated, async (req, res) => {
+  const db = await connectDb();
+  try {
+    const { id } = req.params; // Get the application ID from the URL
 
-app.get("/licensemgt", checkAuthenticated, listLicenses);
+    // Fetch data from the user_table table using the application ID
+    const applicationResult = await db.query(
+      "SELECT * FROM user_table WHERE userid = $1",
+      [id]
+    );
+    const application = applicationResult.rows[0];
+
+    if (!application) {
+      await closeDb(db);
+      return res.status(404).send("Application not found");
+    }
+
+    res.render("companyregdetails", { application });
+  } catch (err) {
+    console.error("Error fetching application details", err);
+    res.status(500).send("Error retrieving application details");
+  } finally {
+    await closeDb(db); // Ensure the connection is closed
+  }
+});
+
+app.get("/licensemgt", checkAuthenticated, async (req, res) => {
+  const db = await connectDb();
+  try {
+    const result = await db.query("SELECT * FROM license_management");
+
+    // Pass the retrieved licenses to the EJS template
+    res.render("licensemgt.ejs", { licenses: result.rows });
+  } catch (err) {
+    console.error("Error fetching licenses:", err);
+    res.status(500).send("Error occurred while fetching licenses.");
+  } finally {
+    await closeDb(db); // Ensure the connection is closed
+  }
+});
 
 // Middleware for parsing request bodies
 app.use(express.urlencoded({ extended: true }));
@@ -241,9 +399,42 @@ app.post("/register", authRegister);
 //module 0 ends here
 
 ///Licence///
-app.get("/renew/:userid", checkAuthenticated, renewLicense);
+app.get("/renew/:userid", async (req, res) => {
+  const { userid } = req.params;
+  const currentDate = new Date(); // Get the current date
+  const expirationDate = new Date(currentDate); // Clone current date
+  expirationDate.setFullYear(currentDate.getFullYear() + 1); // Add one year to expiration date
+  const db = await connectDb();
+  try {
+    await db.query(
+      `UPDATE license_management SET status = 'Paid', expiration_date = $1 WHERE userid = $2`,
+      [expirationDate, userid]
+    );
 
-app.get("/deactivate/:userid", checkAuthenticated, deactivateLicense);
+    res.redirect("/licensemgt");
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await closeDb(db); // Ensure the connection is closed
+  }
+});
+
+app.get("/deactivate/:userid", async (req, res) => {
+  const { userid } = req.params;
+  const db = await connectDb();
+  try {
+    await db.query(
+      `UPDATE license_management SET status = 'Deactivated' WHERE userid = $1`,
+      [userid]
+    );
+
+    res.redirect("/licensemgt");
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await closeDb(db); // Ensure the connection is closed
+  }
+});
 
 // In-memory storage for extraction progress tracking
 const extractionStatus = {
