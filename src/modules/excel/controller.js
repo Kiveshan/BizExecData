@@ -1,8 +1,7 @@
 import { connectDb, closeDb } from "../../config/database.js";
 import path from "path";
-import fs from "fs";
 import xlsx from "xlsx";
-import { uploadsDir, formatDate, formatExcelDate } from "../../utils/file.js";
+import { formatDate, formatExcelDate } from "../../utils/file.js";
 
 export async function checkDateExistsInDb(formattedDate, req) {
   const userid = req.session.userid;
@@ -22,8 +21,8 @@ export async function checkDateExistsInDb(formattedDate, req) {
   }
 }
 
-export async function extractDateFromExcel(filePath) {
-  const workbook = xlsx.readFile(filePath);
+export async function extractDateFromExcel(buffer) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const dateCell = sheet["F3"];
 
@@ -35,8 +34,8 @@ export async function extractDateFromExcel(filePath) {
   return formatExcelDate(rawDate);
 }
 
-export async function processExcelFile(filePath, req, res) {
-  const workbook = xlsx.readFile(filePath);
+export async function processExcelFile(buffer, req, res) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const dateCell = sheet["F3"];
@@ -63,8 +62,8 @@ export async function processExcelFile(filePath, req, res) {
   }
 }
 
-export async function processTxtFile(filePath, req) {
-  const fileContent = fs.readFileSync(filePath, "utf8");
+export async function processTxtFile(buffer, req) {
+  const fileContent = buffer.toString('utf8');
   const lines = fileContent
     .split("\n")
     .map((line) => line.trim())
@@ -165,8 +164,8 @@ async function processFinancialData(data, req, formattedDate) {
   }
 }
 
-export async function processAmendedExcelFile(filePath, req, res) {
-  const workbook = xlsx.readFile(filePath);
+export async function processAmendedExcelFile(buffer, req, res) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const dateCell = sheet["F3"];
