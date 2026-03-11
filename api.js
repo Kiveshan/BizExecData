@@ -2030,8 +2030,8 @@ async function checkDateExistsInDb(formattedDate, req) {
   }
 }
 
-async function extractDateFromExcel(filePath) {
-  const workbook = xlsx.readFile(filePath);
+async function extractDateFromExcel(buffer) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const dateCell = sheet["F3"];
 
@@ -2046,6 +2046,7 @@ async function extractDateFromExcel(filePath) {
 app.get("/upload", checkAuthenticated, (req, res) => {
   res.render("upload.ejs", { errorMessage: null });
 });
+
 // Use express-fileupload middleware
 app.use(fileUpload());
 
@@ -2066,53 +2067,61 @@ app.post("/upload", async (req, res) => {
       );
   }
 
-  try {
-    let fileDate;
-    let formattedFileDate;
-    if (
-      extension === ".xlsx" ||
-      extension === ".xls" ||
-      extension === ".xltx"
-    ) {
-      fileDate = await extractDateFromExcel(uploadedFile.data);
-      const [DBfileYear, DBfileMonth] = fileDate.split("/");
-      formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
+  const uploadPath = path.join(uploadsDir, uploadedFile.name);
+  uploadedFile.mv(uploadPath, async (err) => {
+    if (err) {
+      return res.status(500).send("Error saving file.");
     }
 
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1;
+    try {
+      let fileDate;
+      let formattedFileDate;
+      if (
+        extension === ".xlsx" ||
+        extension === ".xls" ||
+        extension === ".xltx"
+      ) {
+        fileDate = await extractDateFromExcel(uploadedFile.data);
+        const [DBfileYear, DBfileMonth] = fileDate.split("/");
+        formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
+      }
 
-    // Compare file date with current date
-    const [fileYear, fileMonth] = formattedFileDate.split("-").map(Number);
-    if (
-      fileYear > currentYear ||
-      (fileYear === currentYear && fileMonth > currentMonth)
-    ) {
-      return res.render("upload.ejs", {
-        errorMessage:
-          "Cannot upload a date from the future. Please check the file date.",
-      });
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+
+      // Compare file date with current date
+      const [fileYear, fileMonth] = formattedFileDate.split("-").map(Number);
+      if (
+        fileYear > currentYear ||
+        (fileYear === currentYear && fileMonth > currentMonth)
+      ) {
+        return res.render("upload.ejs", {
+          errorMessage:
+            "Cannot upload a date from the future. Please check the file date.",
+        });
+      }
+
+      const dateExists = await checkDateExistsInDb(formattedFileDate, req);
+
+      if (dateExists) {
+        return res.render("upload.ejs", {
+          errorMessage: `File for the date ${fileDate} has already been uploaded.`,
+        });
+      }
+
+      if (extension === ".txt") {
+        const content = uploadedFile.data.toString("utf8");
+        await processTxtFile(content, req);
+      } else {
+        await processExcelFile(uploadedFile.data, req, res);
+      }
+      res.redirect("/excompany.html");
+    } catch (error) {
+      console.error("Error processing file:", error);
+      res.status(500).send("Error processing file.");
     }
-
-    const dateExists = await checkDateExistsInDb(formattedFileDate, req);
-
-    if (dateExists) {
-      return res.render("upload.ejs", {
-        errorMessage: `File for the date ${fileDate} has already been uploaded.`,
-      });
-    }
-
-    if (extension === ".txt") {
-      await processTxtFile(uploadedFile.data, req);
-    } else {
-      await processExcelFile(uploadedFile.data, req, res);
-    }
-    res.redirect("/excompany.html");
-  } catch (error) {
-    console.error("Error processing file:", error);
-    res.status(500).send("Error processing file.");
-  }
+  });
 });
 
 function formatExcelDate(excelDate) {
@@ -2124,8 +2133,8 @@ function formatExcelDate(excelDate) {
   return `${year}/${month}/${day}`;
 }
 
-async function processExcelFile(filePath, req, res) {
-  const workbook = xlsx.readFile(filePath);
+async function processExcelFile(buffer, req, res) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const dateCell = sheet["F3"]; // This points to cell F3
@@ -2158,9 +2167,8 @@ async function processExcelFile(filePath, req, res) {
   } // Pass req to processFinancialData
 }
 
-async function processTxtFile(filePath, req) {
-  const fileContent = fs.readFileSync(filePath, "utf8");
-  const lines = fileContent
+async function processTxtFile(content, req) {
+  const lines = content
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "");
@@ -2293,73 +2301,67 @@ app.post("/amend", async (req, res) => {
       );
   }
 
-  const uploadPath = path.join(uploadsDir, uploadedFile.name);
-  uploadedFile.mv(uploadPath, async (err) => {
-    if (err) {
-      return res.status(500).send("Error saving file.");
-    }
+  try {
+    let fileDate;
+    let formattedFileDate;
 
-    try {
-      let fileDate;
-      let formattedFileDate;
+    if (
+      extension === ".xlsx" ||
+      extension === ".xls" ||
+      extension === ".xltx"
+    ) {
+      fileDate = await extractDateFromExcel(uploadedFile.data);
 
-      if (
-        extension === ".xlsx" ||
-        extension === ".xls" ||
-        extension === ".xltx"
-      ) {
-        fileDate = await extractDateFromExcel(uploadPath);
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
 
-        const currentDate = new Date();
-        const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth() + 1;
+      const [fileYear, fileMonth] = fileDate.split("/").map(Number);
+      const [DBfileYear, DBfileMonth] = fileDate.split("/");
+      formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
 
-        const [fileYear, fileMonth] = fileDate.split("/").map(Number);
-        const [DBfileYear, DBfileMonth] = fileDate.split("/");
-        formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
+      console.log("Formatted File Date:", formattedFileDate);
 
-        console.log("Formatted File Date:", formattedFileDate);
-
-        if (fileYear !== currentYear || fileMonth !== currentMonth) {
-          return res.render("amend", {
-            errorMessage: "Uploaded file is not from the current date.",
-          });
-        }
-      } else if (extension === ".txt") {
-        // For .txt files, you might need to extract the date differently
-        // This is a placeholder - implement according to your .txt file structure
-        //formattedFileDate = await extractDateFromTxt(uploadPath)
-      }
-
-      if (!formattedFileDate) {
+      if (fileYear !== currentYear || fileMonth !== currentMonth) {
         return res.render("amend", {
-          errorMessage: "Unable to extract date from the file.",
+          errorMessage: "Uploaded file is not from the current date.",
         });
       }
-
-      const dateExists = await checkDateExistsInDb(formattedFileDate, req);
-      if (!dateExists) {
-        return res.render("amend", {
-          errorMessage:
-            "File data does not exist. Please upload the document before amending.",
-        });
-      }
-
-      if (extension === ".txt") {
-        await processTxtFile(uploadPath, req);
-      } else {
-        await processAmendedExcelFile(uploadPath, req, res);
-      }
-      res.redirect("/excel_dashboard");
-    } catch (error) {
-      console.error("Error processing file:", error);
-      res.status(500).send("Error processing file.");
+    } else if (extension === ".txt") {
+      // For .txt files, you might need to extract the date differently
+      // This is a placeholder - implement according to your .txt file structure
+      //formattedFileDate = await extractDateFromTxt(uploadPath)
     }
-  });
+
+    if (!formattedFileDate) {
+      return res.render("amend", {
+        errorMessage: "Unable to extract date from the file.",
+      });
+    }
+
+    const dateExists = await checkDateExistsInDb(formattedFileDate, req);
+    if (!dateExists) {
+      return res.render("amend", {
+        errorMessage:
+          "File data does not exist. Please upload the document before amending.",
+      });
+    }
+
+    if (extension === ".txt") {
+      const content = uploadedFile.data.toString("utf8");
+      await processTxtFile(content, req);
+    } else {
+      await processAmendedExcelFile(uploadedFile.data, req, res);
+    }
+    res.redirect("/excel_dashboard");
+  } catch (error) {
+    console.error("Error processing file:", error);
+    res.status(500).send("Error processing file.");
+  }
 });
 
-async function processAmendedExcelFile(filePath, req, res) {
-  const workbook = xlsx.readFile(filePath);
+async function processAmendedExcelFile(buffer, req, res) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const dateCell = sheet["F3"]; // This points to cell F3

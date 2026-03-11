@@ -44,7 +44,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
     let fileDate;
     let formattedFileDate;
     if (/xlsx|xls|xltx/.test(extension)) {
-      fileDate = await extractDateFromExcel(uploadedFile.data);
+      fileDate = extractDateFromExcel(uploadedFile.data);
       const [DBfileYear, DBfileMonth] = fileDate.split("/");
       formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
     }
@@ -71,7 +71,8 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
     }
 
     if (extension === ".txt") {
-      await processTxtFile(uploadedFile.data, req);
+      const content = uploadedFile.data.toString("utf8");
+      await processTxtFile(content, req);
     } else {
       await processExcelFile(uploadedFile.data, req, res);
     }
@@ -103,7 +104,7 @@ router.post("/amend", async (req, res) => {
     let formattedFileDate;
 
     if (/xlsx|xls|xltx/.test(extension)) {
-      fileDate = await extractDateFromExcel(uploadedFile.data);
+      fileDate = extractDateFromExcel(uploadedFile.data);
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1;
@@ -132,7 +133,8 @@ router.post("/amend", async (req, res) => {
     }
 
     if (extension === ".txt") {
-      await processTxtFile(uploadedFile.data, req);
+      const content = uploadedFile.data.toString("utf8");
+      await processTxtFile(content, req);
     } else {
       await processAmendedExcelFile(uploadedFile.data, req, res);
     }
