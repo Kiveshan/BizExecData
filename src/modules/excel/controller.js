@@ -1,5 +1,4 @@
 import { connectDb, closeDb } from "../../config/database.js";
-import path from "path";
 import xlsx from "xlsx";
 import { formatDate, formatExcelDate } from "../../utils/file.js";
 
@@ -21,7 +20,7 @@ export async function checkDateExistsInDb(formattedDate, req) {
   }
 }
 
-export async function extractDateFromExcel(buffer) {
+export function extractDateFromExcel(buffer) {
   const workbook = xlsx.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const dateCell = sheet["F3"];
@@ -62,9 +61,8 @@ export async function processExcelFile(buffer, req, res) {
   }
 }
 
-export async function processTxtFile(buffer, req) {
-  const fileContent = buffer.toString('utf8');
-  const lines = fileContent
+export async function processTxtFile(content, req) {
+  const lines = content
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "");
