@@ -2,6 +2,7 @@ import { connectDb, closeDb } from "../../config/database.js";
 import { findUserByEmail, findRoleIdByRoleName } from "./service.js";
 import { hash } from "bcrypt";
 import passport from "passport";
+import { validateEmail, validatePassword, sanitizeInput } from "../../utils/validation.js";
 
 export async function login(req, res, next) {
   const db = await connectDb();
@@ -102,9 +103,21 @@ export async function register(req, res) {
       throw new Error("Firstname, surname, email, and password are required");
     }
 
+    if (!validateEmail(email)) {
+      throw new Error("Invalid email format");
+    }
+
+    if (!validatePassword(password)) {
+      throw new Error("Password must be at least 8 characters long");
+    }
+
+    const sanitizedFirstname = sanitizeInput(firstname);
+    const sanitizedSurname = sanitizeInput(surname);
+    const sanitizedCompanyName = sanitizeInput(company_name);
+
     const emailCheck = await db.query(
       "SELECT email FROM user_table WHERE email = $1",
-      [email]
+      [email.toLowerCase()]
     );
 
     if (emailCheck.rows.length > 0) {
@@ -127,15 +140,15 @@ export async function register(req, res) {
     `;
 
     const values = [
-      firstname,
-      surname,
-      company_name,
-      email,
-      address,
-      telephone,
+      sanitizedFirstname,
+      sanitizedSurname,
+      sanitizedCompanyName,
+      email.toLowerCase(),
+      sanitizeInput(address),
+      sanitizeInput(telephone),
       hashedPassword,
-      accounting_software,
-      company_services,
+      sanitizeInput(accounting_software),
+      sanitizeInput(company_services),
       roleId,
     ];
 
@@ -145,16 +158,19 @@ export async function register(req, res) {
     await db.query(
       `INSERT INTO license_management (owner_name,company_name,status,date_submitted,userid)
       VALUES ($1,$2,'Pending',$3,$4)`,
-      [firstname + " " + surname, company_name, curentDate, userId]
+      [sanitizedFirstname + " " + sanitizedSurname, sanitizedCompanyName, curentDate, userId]
     );
 
     res.redirect("/login");
   } catch (error) {
     console.error("Registration error:", error);
+    const errorMessage = error.message.includes("already in use") 
+      ? "Email is already in use" 
+      : "Registration failed. Please try again.";
     res
       .status(400)
       .send(
-        `<html><body><h1>Error: ${error.message}</h1><p>Please go back and try again.</p></body></html>`
+        `<html><body><h1>Error</h1><p>${errorMessage}</p><p><a href="/register">Go back</a></p></body></html>`
       );
   } finally {
     await closeDb(db);
