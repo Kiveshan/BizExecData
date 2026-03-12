@@ -21,6 +21,10 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy - required for express-rate-limit behind load balancer/reverse proxy
+app.set('trust proxy', 1);
+
+
 // CORS configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -60,6 +64,8 @@ const authLimiter = rateLimit({
   message: "Too many login attempts, please try again later",
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip validation for X-Forwarded-For when behind proxy
+  validate: { xForwardedForHeader: false },
 });
 
 app.use(express.json());
