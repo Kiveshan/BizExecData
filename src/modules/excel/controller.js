@@ -324,7 +324,7 @@ export async function getExcelCompanyData(req, res) {
     );
     res.json({
       financialData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0].date,
+      lastEntryDate: lastEntryDate.rows[0]?.date || null,
     });
   } catch (err) {
     console.error(err);
@@ -375,7 +375,7 @@ export async function getExcelExpensesData(req, res) {
     );
     res.json({
       expenseData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0].date,
+      lastEntryDate: lastEntryDate.rows[0]?.date || null,
     });
   } catch (err) {
     console.error(err);
@@ -399,7 +399,7 @@ export async function getExcelIncomeData(req, res) {
     );
     res.json({
       incomeData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0].date,
+      lastEntryDate: lastEntryDate.rows[0]?.date || null,
     });
   } catch (err) {
     console.error(err);
