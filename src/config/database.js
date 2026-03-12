@@ -12,7 +12,7 @@ export async function connectDb() {
     database: process.env.RDS_DB_NAME || "BizExecData",
     password: process.env.RDS_PASSWORD || "123456",
     port: process.env.RDS_PORT || 5433,
-    ssl: isProduction ? { rejectUnauthorized: true } : false,
+    ssl: isProduction ? { rejectUnauthorized: false } : false,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     max: 20,
