@@ -156,10 +156,13 @@
       const url = window.location.pathname.split('/').pop();
       const buttons = document.querySelectorAll('.button');
       buttons.forEach(button => {
-        const buttonUrl = button.onclick.toString().match(/'(.*?)'/)?.[1];
+        const buttonUrl = button.dataset.href;
         if (buttonUrl === url) {
           button.style.backgroundColor = 'darkgreen';
         }
+        button.addEventListener('click', function() {
+          window.location.href = buttonUrl;
+        });
       });
     }
   </script>
