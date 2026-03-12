@@ -1,4 +1,5 @@
 import { Router } from "express";
+import app from "../../app.js";
 import { checkAuthenticated, checkNotAuthenticated } from "../../middleware/auth.js";
 import { login, logout, register, registerSimple } from "./controller.js";
 
@@ -8,7 +9,7 @@ router.get("/login", checkNotAuthenticated, (req, res) => {
   res.render("login.ejs");
 });
 
-router.post("/login", checkNotAuthenticated, login);
+router.post("/login", checkNotAuthenticated, app.authLimiter, login);
 
 router.delete("/logout", logout);
 
