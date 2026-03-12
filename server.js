@@ -1,4 +1,4 @@
-import app, { __dirname } from "./src/app.js";
+import app, { __dirname, errorHandler, notFoundHandler } from "./src/app.js";
 import { port } from "./src/config/env.js";
 import path from "path";
 
@@ -52,6 +52,10 @@ app.get("/excost.html", (req, res) => {
 app.get("/exincomes.html", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "exincome.html"));
 });
+
+// Error handling middleware - must be last, after all routes
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Start the server
 app.listen(port, () => {
