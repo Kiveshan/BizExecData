@@ -1,6 +1,9 @@
 import { connectDb, closeDb } from "../../config/database.js";
 import { xero } from "./client.js";
 import jsonpath from "jsonpath";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("xero");
 
 export const extractionStatus = {
   xero: {},
@@ -173,7 +176,7 @@ export async function processXeroData(userid) {
     );
     
     const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
-    console.log(`[Xero] Starting ${isInitialExtraction ? 'initial' : 'update'} extraction for userid: ${userid}`);
+    moduleLogger.info({ userid, isInitialExtraction }, "Starting Xero extraction");
 
     if (!xero.tenants || xero.tenants.length === 0) {
       throw new Error("No tenants available. Please connect to Xero first.");
@@ -184,7 +187,7 @@ export async function processXeroData(userid) {
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
     const startYear = isInitialExtraction ? currentYear - 3 : currentYear - 1;
-    console.log(`[Xero] Date range: ${startYear}-01-01 to ${currentYear}-${currentMonth}-${new Date(currentYear, currentMonth, 0).getDate()}`);
+    moduleLogger.info({ startYear, currentYear, currentMonth }, "Date range calculated");
 
     for (let year = startYear; year <= currentYear; year++) {
       const endMonth = year === currentYear ? currentMonth : 12;
@@ -210,7 +213,7 @@ export async function processXeroData(userid) {
           const summaryData = extractXeroSummaryData(response.body);
 
           if (summaryData.grossProfit == 0.0 && summaryData.netProfit == 0.0) {
-            console.log(`Skipping ${year}-${month} as all values are 0.`);
+            moduleLogger.info({ year, month }, "Skipping month as all values are 0");
             continue;
           }
 
@@ -324,7 +327,7 @@ export async function processXeroData(userid) {
       delete extractionStatus.xero[userid];
     }, 60 * 60 * 1000);
   } catch (err) {
-    console.error("Error in processXeroData:", err);
+    moduleLogger.error({ err }, "Error in processXeroData");
     extractionStatus.xero[userid] = true;
   } finally {
     if (db) await closeDb(db);

@@ -2,6 +2,9 @@ import { connectDb, closeDb } from "../../config/database.js";
 import { oauthClient } from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("quickbooks");
 
 export const extractionStatus = {
   quickbooks: {},
@@ -37,7 +40,7 @@ export async function upsertRevenue(category, amount, userid, date) {
       );
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   } finally {
     await closeDb(db);
   }
@@ -66,7 +69,7 @@ export async function upsertCOGS(category, amount, userid, date) {
       );
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   } finally {
     await closeDb(db);
   }
@@ -95,7 +98,7 @@ export async function upsertExpenses(category, amount, userid, date) {
       );
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   } finally {
     await closeDb(db);
   }
@@ -141,7 +144,7 @@ export async function processQuickBooksData(userid) {
     );
     
     const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
-    console.log(`[QuickBooks] Starting ${isInitialExtraction ? 'initial' : 'update'} extraction for userid: ${userid}`);
+    moduleLogger.info({ userid, isInitialExtraction }, "Starting QuickBooks extraction");
     
     const currentDate = new Date();
     const yearsBack = isInitialExtraction ? 3 : 1;
@@ -149,7 +152,7 @@ export async function processQuickBooksData(userid) {
     const startDate = `${startYear}-${currentDate.getMonth() + 1}-01`;
     const date = new Date(startDate);
     const companyID = oauthClient.getToken().realmId;
-    console.log(`[QuickBooks] Date range: ${startDate} to ${currentDate.toISOString().split('T')[0]}`);
+    moduleLogger.info({ startDate, endDate: currentDate.toISOString().split('T')[0] }, "QuickBooks date range");
 
     try {
       while (date <= currentDate) {
@@ -244,7 +247,7 @@ export async function processQuickBooksData(userid) {
             await db.query(insertQuery, insertValues);
           }
         } catch (e) {
-          console.error(`Error processing data for ${startOfMonth}:`, e);
+          moduleLogger.error({ startOfMonth, error: e }, "Error processing data for month");
         }
 
         date.setMonth(date.getMonth() + 1);
@@ -263,13 +266,13 @@ export async function processQuickBooksData(userid) {
         delete extractionStatus.quickbooks[userid];
       }, 60 * 60 * 1000);
     } catch (error) {
-      console.error("Error in QuickBooks data processing:", error);
+      moduleLogger.error({ error }, "Error in QuickBooks data processing");
       extractionStatus.quickbooks[userid] = true;
     } finally {
       await closeDb(db);
     }
   } catch (error) {
-    console.error("Error in processQuickBooksData:", error);
+    moduleLogger.error({ error }, "Error in processQuickBooksData");
     extractionStatus.quickbooks[userid] = true;
   }
 }
@@ -281,13 +284,13 @@ async function processAdditionalQuickBooksData(userid, companyID, isInitialExtra
     await processExpensesData(userid, companyID, isInitialExtraction);
     await processOtherIncomeData(userid, companyID, isInitialExtraction);
   } catch (error) {
-    console.error("Error processing additional QuickBooks data:", error);
+    moduleLogger.error({ error }, "Error processing additional QuickBooks data");
     throw error;
   }
 }
 
 async function processIncomeData(userid, companyID, isInitialExtraction = true) {
-  console.log(`[QuickBooks] Processing income data (${isInitialExtraction ? 'initial' : 'update'})`);
+  moduleLogger.info({ isInitialExtraction }, "Processing income data");
   const currentDate = new Date();
   const yearsBack = isInitialExtraction ? 3 : 1;
   const startYear = currentDate.getFullYear() - yearsBack;
@@ -307,7 +310,7 @@ async function processIncomeData(userid, companyID, isInitialExtraction = true) 
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving income transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving income transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
@@ -315,7 +318,7 @@ async function processIncomeData(userid, companyID, isInitialExtraction = true) 
 }
 
 async function processCostData(userid, companyID, isInitialExtraction = true) {
-  console.log(`[QuickBooks] Processing cost data (${isInitialExtraction ? 'initial' : 'update'})`);
+  moduleLogger.info({ isInitialExtraction }, "Processing cost data");
   const currentDate = new Date();
   const yearsBack = isInitialExtraction ? 3 : 1;
   const startYear = currentDate.getFullYear() - yearsBack;
@@ -332,7 +335,7 @@ async function processCostData(userid, companyID, isInitialExtraction = true) {
       const costRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "COGS")]');
       await findFinancialData(costRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
-      console.error("Error extracting and saving cost transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving cost transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
@@ -340,7 +343,7 @@ async function processCostData(userid, companyID, isInitialExtraction = true) {
 }
 
 async function processExpensesData(userid, companyID, isInitialExtraction = true) {
-  console.log(`[QuickBooks] Processing expenses data (${isInitialExtraction ? 'initial' : 'update'})`);
+  moduleLogger.info({ isInitialExtraction }, "Processing expenses data");
   const currentDate = new Date();
   const yearsBack = isInitialExtraction ? 3 : 1;
   const startYear = currentDate.getFullYear() - yearsBack;
@@ -360,7 +363,7 @@ async function processExpensesData(userid, companyID, isInitialExtraction = true
       );
       await findFinancialData(expenseRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving expense transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving expense transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
@@ -368,7 +371,7 @@ async function processExpensesData(userid, companyID, isInitialExtraction = true
 }
 
 async function processOtherIncomeData(userid, companyID, isInitialExtraction = true) {
-  console.log(`[QuickBooks] Processing other income data (${isInitialExtraction ? 'initial' : 'update'})`);
+  moduleLogger.info({ isInitialExtraction }, "Processing other income data");
   const currentDate = new Date();
   const yearsBack = isInitialExtraction ? 3 : 1;
   const startYear = currentDate.getFullYear() - yearsBack;
@@ -393,7 +396,7 @@ async function processOtherIncomeData(userid, companyID, isInitialExtraction = t
         upsertRevenue
       );
     } catch (err) {
-      console.error("Error extracting and saving other income transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving other income transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
