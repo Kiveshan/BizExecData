@@ -4,6 +4,9 @@ import { hash, compare } from "bcrypt";
 import { encrypt, decrypt } from "../../utils/crypto.js";
 import jsonpath from "jsonpath";
 import { formatDate } from "../../utils/file.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("sage");
 
 const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "REDACTED";
@@ -42,7 +45,7 @@ export async function validateSageCredentials(username, password) {
       };
     }
   } catch (error) {
-    console.error("Error validating Sage credentials:", error);
+    moduleLogger.error({ error }, "Error validating Sage credentials");
     return { isValid: false, error: error.message };
   }
 }
@@ -129,7 +132,7 @@ export async function getCompanyData(username, password) {
       companyData: selectedCompany,
     };
   } catch (error) {
-    console.error("Error in getCompanyData:", error);
+    moduleLogger.error({ error }, "Error in getCompanyData");
     return { isValid: false, error: error.message };
   }
 }
@@ -141,7 +144,7 @@ export function generateMonthlyDateRanges(isInitialExtraction = true, startMonth
   const currentMonth = currentDate.getMonth();
   const yearsBack = isInitialExtraction ? 3 : 1;
   const startYear = currentYear - yearsBack;
-  console.log(`[Sage] Generating date ranges (${isInitialExtraction ? 'initial' : 'update'}): ${startYear}-01 to ${currentYear}-${currentMonth + 1}`);
+  moduleLogger.info({ isInitialExtraction, startYear, currentYear, currentMonth: currentMonth + 1 }, "Generating date ranges");
 
   for (let year = startYear; year <= currentYear; year++) {
     const firstMonth = year === startYear ? startMonth : 0;
@@ -196,7 +199,7 @@ export async function getProfitAndLossForSpecificMonth(
       data: profitLossData,
     };
   } catch (error) {
-    console.error(`Error getting profit and loss data:`, error);
+    moduleLogger.error({ error }, "Error getting profit and loss data");
     throw error;
   }
 }
@@ -230,7 +233,7 @@ export async function processMonthlyData(
         await insertSageCostOfSales(profitAndLossData, userid, recordDate);
         await insertSageTotals(profitAndLossData, userid, recordDate);
       } catch (error) {
-        console.error(`Failed to process ${range.monthName}:`, error);
+        moduleLogger.error({ month: range.monthName, error }, "Failed to process month");
       }
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -251,7 +254,7 @@ export async function processMonthlyData(
       delete extractionStatus.sage[userid];
     }, 60 * 60 * 1000);
   } catch (error) {
-    console.error(`Error in processMonthlyData:`, error);
+    moduleLogger.error({ error }, "Error in processMonthlyData");
     extractionStatus.sage[userid] = true;
   }
 }
@@ -289,7 +292,7 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
     }
     return salesExtracted;
   } catch (err) {
-    console.error(`Error in getSageRevenue:`, err);
+    moduleLogger.error({ err }, "Error in getSageRevenue");
     throw err;
   } finally {
     await closeDb(db);
@@ -329,7 +332,7 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
     }
     return expensesExtracted;
   } catch (err) {
-    console.error(`Error in insertSageExpenses:`, err);
+    moduleLogger.error({ err }, "Error in insertSageExpenses");
     throw err;
   } finally {
     await closeDb(db);
@@ -369,7 +372,7 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
     }
     return costOfSalesExtracted;
   } catch (err) {
-    console.error(`Error in insertSageCostOfSales:`, err);
+    moduleLogger.error({ err }, "Error in insertSageCostOfSales");
     throw err;
   } finally {
     await closeDb(db);
@@ -442,7 +445,7 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
       date: formattedDate,
     };
   } catch (err) {
-    console.error(`Error in insertSageTotals:`, err);
+    moduleLogger.error({ err }, "Error in insertSageTotals");
     throw err;
   } finally {
     await closeDb(db);
@@ -464,7 +467,7 @@ export async function getSageCompanyData(req, res) {
     );
     res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageCompanyData");
     res.status(500).send("Server Error");
   } finally {
     await closeDb(db);
@@ -481,7 +484,7 @@ export async function getSageProfitData(req, res) {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageProfitData");
     res.status(500).send("Server Error");
   } finally {
     await closeDb(db);
@@ -502,7 +505,7 @@ export async function getSageExpensesData(req, res) {
     );
     res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageExpensesData");
     res.status(500).send("Server Error");
   } finally {
     await closeDb(db);
@@ -519,7 +522,7 @@ export async function getSageRevenueData(req, res) {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageRevenueData");
     res.status(500).send("Server Error");
   } finally {
     await closeDb(db);
@@ -536,7 +539,7 @@ export async function getSageCostOfSalesData(req, res) {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageCostOfSalesData");
     res.status(500).send("Server Error");
   } finally {
     await closeDb(db);
