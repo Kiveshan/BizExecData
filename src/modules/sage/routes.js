@@ -16,6 +16,9 @@ import {
   getSageRevenueData,
   getSageCostOfSalesData,
 } from "./controller.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const sageRouteLogger = createModuleLogger("sage-routes");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +26,7 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 router.get("/sagelogin", (req, res) => {
+  sageRouteLogger.debug("Serving sagelogin page");
   res.render("sagelogin");
 });
 
@@ -31,6 +35,7 @@ router.post("/sagelogin", async (req, res) => {
   try {
     db = await connectDb();
     const { email, password, confirmed } = req.body;
+    sageRouteLogger.debug({ email }, "Sage login attempt");
 
     const result = await db.query("SELECT * FROM user_table WHERE email = $1", [
       email,
@@ -38,10 +43,12 @@ router.post("/sagelogin", async (req, res) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
+      sageRouteLogger.debug({ email, userid: user.userid }, "Existing user found");
       const passwordMatch = await compare(password, user.password);
 
       if (passwordMatch) {
         if (result.rows[0].status == "pending") {
+          sageRouteLogger.warn({ userid: user.userid }, "User login failed - status pending");
           return res.render("sagelogin", {
             error:
               "Your account is awaiting approval. Please wait for our admin to approve your account",
@@ -54,6 +61,7 @@ router.post("/sagelogin", async (req, res) => {
         );
 
         if (sage_license.rows[0].status == "Pending") {
+          sageRouteLogger.warn({ userid: user.userid }, "User login failed - license pending");
           return res.render("sagelogin", {
             error:
               "Your license has not been renewed, Please contact our support team",
@@ -66,13 +74,16 @@ router.post("/sagelogin", async (req, res) => {
           email: user.email,
           password: encrypt(password),
         };
+        sageRouteLogger.info({ userid: user.userid }, "User logged in successfully");
 
         if (result.rows[0].first_time_insertion == true) {
+          sageRouteLogger.info({ userid: user.userid }, "Redirecting to initial extraction");
           return res.redirect("/extract-profit-loss");
         }
 
         return res.redirect("/sagecompany");
       } else {
+        sageRouteLogger.warn({ email }, "Login failed - invalid password");
         return res.render("sagelogin", {
           error: "Invalid password for existing account",
           email: email,
@@ -81,15 +92,18 @@ router.post("/sagelogin", async (req, res) => {
     }
 
     if (confirmed !== "true") {
+      sageRouteLogger.debug({ email }, "Registration confirmation required");
       return res.render("sagelogin", {
         error: "Please confirm registration to continue",
         email: email,
       });
     }
 
+    sageRouteLogger.info({ email }, "Validating Sage credentials for new user");
     const validationResult = await validateSageCredentials(email, password);
 
     if (!validationResult.isValid) {
+      sageRouteLogger.warn({ email, error: validationResult.error }, "Sage credentials validation failed");
       return res.render("sagelogin", {
         error: validationResult.error || "Invalid Sage credentials.",
         email: email,
@@ -99,6 +113,7 @@ router.post("/sagelogin", async (req, res) => {
     const companyData = await getCompanyData(email, password);
 
     if (!companyData.isValid || companyData.noCompanies) {
+      sageRouteLogger.warn({ email, noCompanies: companyData.noCompanies }, "Company data retrieval failed");
       return res.render("sagelogin", {
         error: companyData.noCompanies
           ? "No companies found for your Sage account."
@@ -107,6 +122,7 @@ router.post("/sagelogin", async (req, res) => {
       });
     }
 
+    sageRouteLogger.info({ email, companyId: companyData.companyId }, "Creating new Sage user");
     const saltRounds = 10;
     const hashedPassword = await hash(password, saltRounds);
 
@@ -149,13 +165,14 @@ router.post("/sagelogin", async (req, res) => {
       VALUES ('N/A', $1, 'Pending', $2, $3)`,
       [companyData.companyData.Name, currentDate, newUserId]
     );
+    sageRouteLogger.info({ newUserId, email }, "New Sage user registered successfully");
 
     return res.render("sagelogin", {
       error:
         "Thank you for registering with BizExecData. Please wait for our admin to approve you",
     });
   } catch (err) {
-    console.error("Error during login/registration:", err);
+    sageRouteLogger.error({ err, email: req.body.email }, "Error during login/registration");
     res.render("sagelogin", {
       error: "An error occurred during login/registration. Please try again.",
       email: req.body.email,
@@ -169,8 +186,10 @@ router.post("/sagelogin", async (req, res) => {
 
 router.get("/extract-profit-loss", (req, res) => {
   if (!req.session.user) {
+    sageRouteLogger.warn("Unauthorized access to extract-profit-loss page");
     return res.redirect("/sagelogin");
   }
+  sageRouteLogger.debug({ userid: req.session.user.userid }, "Serving extract-profit-loss page");
   res.render("profit-loss-loading", {
     source: "sage",
     title: "Extracting Sage Data",
@@ -180,6 +199,7 @@ router.get("/extract-profit-loss", (req, res) => {
 
 router.get("/check-extraction-complete", (req, res) => {
   if (!req.session.user) {
+    sageRouteLogger.warn("Unauthorized check-extraction-complete request");
     return res.status(401).json({
       complete: false,
       error: "Not authenticated",
@@ -187,18 +207,21 @@ router.get("/check-extraction-complete", (req, res) => {
   }
 
   const userid = req.session.user.userid;
+  const status = extractionStatus.sage[userid];
+  sageRouteLogger.debug({ userid, status }, "Extraction status checked");
 
-  if (extractionStatus.sage[userid] === undefined) {
+  if (status === undefined) {
     return res.json({ complete: true });
   }
 
-  res.json({ complete: extractionStatus.sage[userid] });
+  res.json({ complete: status });
 });
 
 router.post("/start-profit-loss-process", async (req, res) => {
   let db;
   try {
     if (!req.session.user) {
+      sageRouteLogger.warn("Unauthorized start-profit-loss-process request");
       return res.status(401).json({
         success: false,
         error: "Not authenticated",
@@ -214,6 +237,7 @@ router.post("/start-profit-loss-process", async (req, res) => {
     );
     
     const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+    sageRouteLogger.info({ userid, isInitialExtraction }, "Starting Sage data extraction");
 
     const companyid = req.session.user.companyid;
     const email = req.session.user.email;
@@ -227,7 +251,7 @@ router.post("/start-profit-loss-process", async (req, res) => {
       message: "Data extraction started",
     });
   } catch (error) {
-    console.error("Error starting profit and loss process:", error);
+    sageRouteLogger.error({ error }, "Error starting profit and loss process");
     res.status(500).json({
       success: false,
       error: "Failed to start profit and loss process: " + error.message,
@@ -241,12 +265,15 @@ router.post("/start-profit-loss-process", async (req, res) => {
 
 router.get("/getProfitandLoss", async (req, res) => {
   if (!req.session.user) {
+    sageRouteLogger.warn("Unauthorized getProfitandLoss request");
     return res.redirect("/sagelogin");
   }
+  sageRouteLogger.debug({ userid: req.session.user.userid }, "Redirecting to extract-profit-loss");
   res.redirect("/extract-profit-loss");
 });
 
 router.get("/sagecompany", (req, res) => {
+  sageRouteLogger.debug("Serving sagecompany page");
   res.sendFile(path.join(__dirname, "..", "..", "..", "public", "sage_company.html"));
 });
 
@@ -258,9 +285,10 @@ router.post("/check-user-exists", async (req, res) => {
     const result = await db.query("SELECT * FROM user_table WHERE email = $1", [
       email,
     ]);
+    sageRouteLogger.debug({ email, exists: result.rows.length > 0 }, "Checked if user exists");
     res.json({ exists: result.rows.length > 0 });
   } catch (err) {
-    console.error("Error checking if user exists:", err);
+    sageRouteLogger.error({ err, email: req.body.email }, "Error checking if user exists");
     res.json({ exists: false, error: err.message });
   } finally {
     if (db) {

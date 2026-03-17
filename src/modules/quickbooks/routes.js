@@ -15,6 +15,9 @@ import {
   extractionStatus,
 } from "./extractor.js";
 import { formatDate } from "../../utils/file.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,10 +25,12 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 router.get("/auth", (req, res) => {
+  qbRouteLogger.debug("Initiating QuickBooks OAuth flow");
   const authUri = oauthClient.authorizeUri({
     scope: [OAuthClient.scopes.Accounting],
     state: "testState",
   });
+  qbRouteLogger.debug({ authUri }, "QuickBooks auth URI generated");
   res.redirect(authUri);
 });
 
@@ -51,6 +56,8 @@ router.get(authurl, async (req, res) => {
       companyInfo.NameValue.find((nv) => nv.Name === "QBOIndustryType")?.Value ||
       "";
 
+    qbRouteLogger.info({ companyID, companyName, email }, "QuickBooks OAuth callback - company info extracted");
+
     const existingUser = await db.query(
       "SELECT * FROM user_table WHERE company_id = $1",
       [companyID]
@@ -62,6 +69,7 @@ router.get(authurl, async (req, res) => {
     );
 
     if (existingUser.rows.length === 0) {
+      qbRouteLogger.info({ companyID }, "New QuickBooks user registration");
       const result = await db.query(
         `INSERT INTO user_table (firstname, surname, company_id, company_name, email, address, company_services, first_time_insertion, accounting_software)
          VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Quickbooks')
@@ -88,6 +96,7 @@ router.get(authurl, async (req, res) => {
       exsistingLicense.rows[0].status === "Pending" ||
       exsistingLicense.rows[0].status === "Deactivated"
     ) {
+      qbRouteLogger.warn({ userid: existingUser.rows[0].userid, status: existingUser.rows[0].status }, "QuickBooks user access denied");
       return res.redirect(
         `/index.html?message=Your account is ${existingUser.rows[0].status} and your License is ${exsistingLicense.rows[0].status}. Please contact our support team.`
       );
@@ -99,13 +108,15 @@ router.get(authurl, async (req, res) => {
       exsistingLicense.rows[0].status === "Paid"
     ) {
       req.session.userid = existingUser.rows[0].userid;
+      qbRouteLogger.info({ userid: existingUser.rows[0].userid }, "QuickBooks user redirected to loading");
       res.redirect(`/quickbooks-loading`);
     } else {
       req.session.userid = existingUser.rows[0].userid;
+      qbRouteLogger.info({ userid: existingUser.rows[0].userid }, "QuickBooks user redirected to company");
       res.redirect("/company");
     }
   } catch (err) {
-    console.error(err);
+    qbRouteLogger.error({ err }, "Error during QuickBooks OAuth callback");
     res.status(500).send("Error occurred while fetching company data.");
   } finally {
     await closeDb(db);
@@ -121,6 +132,7 @@ router.get("/update", async (req, res) => {
   let date = new Date(startDate);
 
   const db = await connectDb();
+  qbRouteLogger.info({ userid, companyID, startDate }, "QuickBooks update process started");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -210,13 +222,14 @@ router.get("/update", async (req, res) => {
         await db.query(insertQuery, insertValues);
       }
     } catch (e) {
-      console.error(`Error processing data for ${startOfMonth}:`, e);
+      qbRouteLogger.error({ error: e, startOfMonth }, "Error processing QuickBooks data for month");
     }
 
     date.setMonth(date.getMonth() + 1);
   }
 
   await closeDb(db);
+  qbRouteLogger.info({ userid }, "QuickBooks update process completed");
   res.redirect("/fetch-income");
 });
 
@@ -226,6 +239,8 @@ router.get("/fetch-income", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching income data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -240,7 +255,7 @@ router.get("/fetch-income", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting income data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -248,6 +263,7 @@ router.get("/fetch-income", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Income data fetch completed");
   res.redirect("/fetch-cost");
 });
 
@@ -257,6 +273,8 @@ router.get("/fetch-cost", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching cost data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -271,7 +289,7 @@ router.get("/fetch-cost", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting cost data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -279,6 +297,7 @@ router.get("/fetch-cost", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Cost data fetch completed");
   res.redirect("/fetch-expenses");
 });
 
@@ -288,6 +307,8 @@ router.get("/fetch-expenses", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching expenses data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -302,7 +323,7 @@ router.get("/fetch-expenses", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting expenses data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -310,6 +331,7 @@ router.get("/fetch-expenses", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Expenses data fetch completed");
   res.redirect("/fetch-otherexpenses");
 });
 
@@ -319,6 +341,8 @@ router.get("/fetch-otherexpenses", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching other expenses data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -333,7 +357,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting other expenses data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -341,6 +365,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Other expenses data fetch completed");
   res.redirect("/fetch-otherincome");
 });
 
@@ -351,6 +376,8 @@ router.get("/fetch-otherincome", async (req, res) => {
   const currentDate = new Date();
   let date = new Date(startDate);
   const db = await connectDb();
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching other income data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -365,7 +392,7 @@ router.get("/fetch-otherincome", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting other income data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -376,14 +403,17 @@ router.get("/fetch-otherincome", async (req, res) => {
     "UPDATE user_table SET first_time_insertion = false WHERE userid = $1",
     [userid]
   );
+  qbRouteLogger.info({ userid }, "QuickBooks initial extraction completed, first_time_insertion set to false");
   await closeDb(db);
   res.redirect("/company");
 });
 
 router.get("/quickbooks-loading", (req, res) => {
   if (!req.session.userid) {
+    qbRouteLogger.warn("Unauthorized access to quickbooks-loading page");
     return res.redirect("/login");
   }
+  qbRouteLogger.debug({ userid: req.session.userid }, "Serving QuickBooks loading page");
   res.render("profit-loss-loading", {
     source: "quickbooks",
     title: "Extracting QuickBooks Data",
@@ -394,6 +424,7 @@ router.get("/quickbooks-loading", (req, res) => {
 router.post("/start-quickbooks-extraction", async (req, res) => {
   try {
     if (!req.session.userid) {
+      qbRouteLogger.warn("Unauthorized QuickBooks extraction attempt");
       return res.status(401).json({
         success: false,
         error: "Not authenticated",
@@ -401,6 +432,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
     }
 
     const userid = req.session.userid;
+    qbRouteLogger.info({ userid }, "Starting QuickBooks data extraction");
     extractionStatus.quickbooks[userid] = false;
     processQuickBooksData(userid);
 
@@ -409,7 +441,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
       message: "Data extraction started",
     });
   } catch (error) {
-    console.error("Error starting QuickBooks extraction:", error);
+    qbRouteLogger.error({ error }, "Error starting QuickBooks extraction");
     res.status(500).json({
       success: false,
       error: "Failed to start QuickBooks extraction: " + error.message,
@@ -419,6 +451,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
 
 router.get("/check-quickbooks-extraction", (req, res) => {
   if (!req.session.userid) {
+    qbRouteLogger.warn("Unauthorized check-quickbooks-extraction request");
     return res.status(401).json({
       complete: false,
       error: "Not authenticated",
@@ -426,37 +459,44 @@ router.get("/check-quickbooks-extraction", (req, res) => {
   }
 
   const userid = req.session.userid;
+  const status = extractionStatus.quickbooks[userid];
+  qbRouteLogger.debug({ userid, status }, "QuickBooks extraction status checked");
 
-  if (extractionStatus.quickbooks[userid] === undefined) {
+  if (status === undefined) {
     return res.json({ complete: true });
   }
 
-  res.json({ complete: extractionStatus.quickbooks[userid] });
+  res.json({ complete: status });
 });
 
 router.get("/quickbooks", (req, res) => {
   try {
     if (!oauth2_token_json) {
+      qbRouteLogger.debug("No OAuth token found, redirecting to auth");
       return res.redirect("/auth");
     }
 
     const token = oauth2_token_json;
 
     if (oauthClient.isAccessTokenValid()) {
+      qbRouteLogger.debug("Access token valid, serving quickbooks page");
       return res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
     }
 
+    qbRouteLogger.debug("Access token expired, refreshing token");
     oauthClient
       .refreshUsingToken(token.refresh_token)
       .then((authResponse) => {
         setOAuthToken(authResponse.getJson());
+        qbRouteLogger.debug("Token refreshed successfully");
         res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
       })
       .catch((err) => {
+        qbRouteLogger.error({ err }, "Error refreshing token");
         res.redirect("/auth");
       });
   } catch (error) {
-    console.error("Error during update:", error);
+    qbRouteLogger.error({ error }, "Error in quickbooks route");
     res.status(500).send("Update failed");
   }
 });

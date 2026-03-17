@@ -164,14 +164,27 @@
             .then(response => response.text())
             .then(data => {
                 document.getElementById('sidebar').innerHTML = data;
-                setTimeout(highlightButtons, 0);
+                attachSidebarHandlers();
+                highlightButtons();
             });
+
+        function attachSidebarHandlers() {
+            const buttons = document.querySelectorAll('.button');
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const href = this.getAttribute('data-href');
+                    if (href) {
+                        window.location.href = href;
+                    }
+                });
+            });
+        }
 
         function highlightButtons() {
             const url = window.location.pathname.split('/').pop();
             const buttons = document.querySelectorAll('.button');
             buttons.forEach(button => {
-                const buttonUrl = button.onclick.toString().match(/'(.*?)'/)?.[1];
+                const buttonUrl = button.getAttribute('data-href');
                 if (buttonUrl === url) {
                     button.style.backgroundColor = '#4a90e2';
                 }

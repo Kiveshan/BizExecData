@@ -12,10 +12,14 @@ import {
   getCompanyRegApplications,
   getCompanyRegDetails,
 } from "./controller.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const adminRouteLogger = createModuleLogger("admin-routes");
 
 const router = Router();
 
 router.get("/adminmenu", checkAuthenticated, (req, res) => {
+  adminRouteLogger.debug({ userid: req.session?.userid }, "Serving admin menu");
   res.render("adminmenu.ejs");
 });
 
