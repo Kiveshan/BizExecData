@@ -1,4 +1,4 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import { findUserByEmail, findRoleIdByRoleName } from "./service.js";
 import { hash } from "bcrypt";
 import passport from "passport";
@@ -8,7 +8,7 @@ import logger, { createModuleLogger } from "../../utils/logger.js";
 const authControllerLogger = createModuleLogger("auth-controller");
 
 export async function login(req, res, next) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   authControllerLogger.debug({ email: req.body.email }, "Login attempt started");
 
   passport.authenticate("local", async (err, user, info) => {
@@ -23,10 +23,11 @@ export async function login(req, res, next) {
       const loggedInUser = await findUserByEmail(user.email);
       authControllerLogger.debug({ userid: loggedInUser.userid, roleid: loggedInUser.roleid }, "User found");
 
-      const exsistingLicense = await db.query(
-        `SELECT * FROM license_management WHERE userid = $1`,
-        [user.userid]
-      );
+      const exsistingLicense = await prisma.license_management.findFirst({
+        where: {
+          userid: String(user.userid),
+        },
+      });
 
       if (loggedInUser.roleid === 3) {
         req.login(user, async (err) => {
@@ -50,10 +51,10 @@ export async function login(req, res, next) {
         }
 
         if (
-          exsistingLicense.rows.length === 0 ||
-          exsistingLicense.rows[0].status !== "Paid"
+          !exsistingLicense ||
+          exsistingLicense.status !== "Paid"
         ) {
-          authControllerLogger.warn({ userid: loggedInUser.userid, licenseStatus: exsistingLicense.rows[0]?.status }, "Login failed - license not paid");
+          authControllerLogger.warn({ userid: loggedInUser.userid, licenseStatus: exsistingLicense?.status }, "Login failed - license not paid");
           return res.render("login", {
             error: "Please ensure you purchase licensing for the software.",
           });
@@ -75,8 +76,6 @@ export async function login(req, res, next) {
     } catch (error) {
       authControllerLogger.error({ error }, "Login error");
       return next(error);
-    } finally {
-      await closeDb(db);
     }
   })(req, res, next);
 }
@@ -115,8 +114,6 @@ export async function register(req, res) {
 
   authControllerLogger.info({ email, company_name, accounting_software }, "Registration started");
 
-  const db = await connectDb();
-
   try {
     if (!email || !password || !firstname || !surname) {
       authControllerLogger.warn({ email }, "Registration failed - missing required fields");
@@ -137,12 +134,17 @@ export async function register(req, res) {
     const sanitizedSurname = sanitizeInput(surname);
     const sanitizedCompanyName = sanitizeInput(company_name);
 
-    const emailCheck = await db.query(
-      "SELECT email FROM user_table WHERE email = $1",
-      [email.toLowerCase()]
-    );
+    const prisma = getPrismaClient();
+    const emailCheck = await prisma.user_table.findFirst({
+      where: {
+        email: email.toLowerCase(),
+      },
+      select: {
+        email: true,
+      },
+    });
 
-    if (emailCheck.rows.length > 0) {
+    if (emailCheck) {
       authControllerLogger.warn({ email }, "Registration failed - email already exists");
       throw new Error("Email is already in use");
     }
@@ -156,34 +158,36 @@ export async function register(req, res) {
       roleId = 1;
     }
 
-    const insertQuery = `
-      INSERT INTO user_table (
-        firstname, surname, company_name, email, address, telephone, password, accounting_software, company_services, roleid, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,'pending') RETURNING userid
-    `;
-
-    const values = [
-      sanitizedFirstname,
-      sanitizedSurname,
-      sanitizedCompanyName,
-      email.toLowerCase(),
-      sanitizeInput(address),
-      sanitizeInput(telephone),
-      hashedPassword,
-      sanitizeInput(accounting_software),
-      sanitizeInput(company_services),
-      roleId,
-    ];
-
-    const result = await db.query(insertQuery, values);
-    const userId = result.rows[0].userid;
+    const createdUser = await prisma.user_table.create({
+      data: {
+        firstname: sanitizedFirstname,
+        surname: sanitizedSurname,
+        company_name: sanitizedCompanyName,
+        email: email.toLowerCase(),
+        address: sanitizeInput(address),
+        telephone: sanitizeInput(telephone),
+        password: hashedPassword,
+        accounting_software: sanitizeInput(accounting_software),
+        company_services: sanitizeInput(company_services),
+        roleid: roleId,
+        status: "pending",
+      },
+      select: {
+        userid: true,
+      },
+    });
+    const userId = createdUser.userid;
     authControllerLogger.info({ userId, email }, "User registered successfully");
 
-    await db.query(
-      `INSERT INTO license_management (owner_name,company_name,status,date_submitted,userid)
-      VALUES ($1,$2,'Pending',$3,$4)`,
-      [sanitizedFirstname + " " + sanitizedSurname, sanitizedCompanyName, curentDate, userId]
-    );
+    await prisma.license_management.create({
+      data: {
+        owner_name: sanitizedFirstname + " " + sanitizedSurname,
+        company_name: sanitizedCompanyName,
+        status: "Pending",
+        date_submitted: curentDate,
+        userid: String(userId),
+      },
+    });
     authControllerLogger.info({ userId }, "License record created");
 
     res.redirect("/login");
@@ -197,8 +201,6 @@ export async function register(req, res) {
       .send(
         `<html><body><h1>Error</h1><p>${errorMessage}</p><p><a href="/register">Go back</a></p></body></html>`
       );
-  } finally {
-    await closeDb(db);
   }
 }
 
@@ -224,27 +226,26 @@ export async function registerSimple(req, res) {
 }
 
 export async function updateUserRole(userid, chosen_role) {
-  const db = await connectDb();
-
   try {
+    const prisma = getPrismaClient();
     authControllerLogger.info({ userid, chosen_role }, "Updating user role");
-    const roleQuery = {
-      text: `
-        UPDATE user_table
-        SET roleid = r.roleid
-        FROM roles r
-        WHERE user_table.userid = $1
-        AND r.rolename = $2;
-      `,
-      values: [userid, chosen_role],
-    };
 
-    await db.query(roleQuery);
+    const roleId = await findRoleIdByRoleName(chosen_role);
+    if (!roleId) {
+      throw new Error("Role not found");
+    }
+
+    await prisma.user_table.update({
+      where: {
+        userid,
+      },
+      data: {
+        roleid: roleId,
+      },
+    });
     authControllerLogger.info({ userid, chosen_role }, "User role updated successfully");
   } catch (error) {
     authControllerLogger.error({ error, userid, chosen_role }, "Error updating user role");
     throw error;
-  } finally {
-    await closeDb(db);
   }
 }

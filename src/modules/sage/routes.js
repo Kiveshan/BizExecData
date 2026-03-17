@@ -1,7 +1,7 @@
 import { Router } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import { hash, compare } from "bcrypt";
 import { encrypt } from "../../utils/crypto.js";
 import {
@@ -31,23 +31,21 @@ router.get("/sagelogin", (req, res) => {
 });
 
 router.post("/sagelogin", async (req, res) => {
-  let db;
+  const prisma = getPrismaClient();
   try {
-    db = await connectDb();
     const { email, password, confirmed } = req.body;
     sageRouteLogger.debug({ email }, "Sage login attempt");
 
-    const result = await db.query("SELECT * FROM user_table WHERE email = $1", [
-      email,
-    ]);
+    const user = await prisma.user_table.findFirst({
+      where: { email },
+    });
 
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
+    if (user) {
       sageRouteLogger.debug({ email, userid: user.userid }, "Existing user found");
       const passwordMatch = await compare(password, user.password);
 
       if (passwordMatch) {
-        if (result.rows[0].status == "pending") {
+        if (user.status == "pending") {
           sageRouteLogger.warn({ userid: user.userid }, "User login failed - status pending");
           return res.render("sagelogin", {
             error:
@@ -55,12 +53,11 @@ router.post("/sagelogin", async (req, res) => {
           });
         }
 
-        const sage_license = await db.query(
-          `SELECT * FROM license_management WHERE userid = $1`,
-          [result.rows[0].sage_company_id]
-        );
+        const sage_license = await prisma.license_management.findFirst({
+          where: { userid: String(user.sage_company_id) },
+        });
 
-        if (sage_license.rows[0].status == "Pending") {
+        if (sage_license?.status == "Pending") {
           sageRouteLogger.warn({ userid: user.userid }, "User login failed - license pending");
           return res.render("sagelogin", {
             error:
@@ -76,7 +73,7 @@ router.post("/sagelogin", async (req, res) => {
         };
         sageRouteLogger.info({ userid: user.userid }, "User logged in successfully");
 
-        if (result.rows[0].first_time_insertion == true) {
+        if (user.first_time_insertion == true) {
           sageRouteLogger.info({ userid: user.userid }, "Redirecting to initial extraction");
           return res.redirect("/extract-profit-loss");
         }
@@ -137,34 +134,37 @@ router.post("/sagelogin", async (req, res) => {
       "," +
       companyData.companyData.CompanyInfo05;
 
-    const insertResult = await db.query(
-      `
-      INSERT INTO user_table (
-        firstname, surname, sage_company_id, company_name, telephone, address, 
-        company_services, first_time_insertion, accounting_software, email, password
-      ) VALUES (
-        'N/A', 'N/A', $1, $2, $3, $4, 'N/A', $5, 'Sage', $6, $7
-      ) RETURNING sage_company_id`,
-      [
-        companyData.companyData.ID,
-        companyData.companyData.Name,
-        companyData.companyData.Telephone,
-        full_address,
-        true,
+    const createdUser = await prisma.user_table.create({
+      data: {
+        firstname: "N/A",
+        surname: "N/A",
+        sage_company_id: BigInt(companyData.companyData.ID),
+        company_name: companyData.companyData.Name,
+        telephone: companyData.companyData.Telephone,
+        address: full_address,
+        company_services: "N/A",
+        first_time_insertion: true,
+        accounting_software: "Sage",
         email,
-        hashedPassword,
-      ]
-    );
+        password: hashedPassword,
+      },
+      select: {
+        sage_company_id: true,
+      },
+    });
 
-    const newUser = insertResult.rows[0];
-    const newUserId = newUser.sage_company_id;
+    const newUserId = createdUser.sage_company_id;
     const currentDate = new Date();
-    await db.query(
-      `
-      INSERT INTO license_management(owner_name, company_name, status, date_submitted, userid)
-      VALUES ('N/A', $1, 'Pending', $2, $3)`,
-      [companyData.companyData.Name, currentDate, newUserId]
-    );
+
+    await prisma.license_management.create({
+      data: {
+        owner_name: "N/A",
+        company_name: companyData.companyData.Name,
+        status: "Pending",
+        date_submitted: currentDate,
+        userid: String(newUserId),
+      },
+    });
     sageRouteLogger.info({ newUserId, email }, "New Sage user registered successfully");
 
     return res.render("sagelogin", {
@@ -177,10 +177,6 @@ router.post("/sagelogin", async (req, res) => {
       error: "An error occurred during login/registration. Please try again.",
       email: req.body.email,
     });
-  } finally {
-    if (db) {
-      await closeDb(db);
-    }
   }
 });
 
@@ -218,7 +214,6 @@ router.get("/check-extraction-complete", (req, res) => {
 });
 
 router.post("/start-profit-loss-process", async (req, res) => {
-  let db;
   try {
     if (!req.session.user) {
       sageRouteLogger.warn("Unauthorized start-profit-loss-process request");
@@ -228,15 +223,15 @@ router.post("/start-profit-loss-process", async (req, res) => {
       });
     }
 
-    db = await connectDb();
+    const prisma = getPrismaClient();
     const userid = req.session.user.userid;
-    
-    const userResult = await db.query(
-      "SELECT first_time_insertion FROM user_table WHERE userid = $1",
-      [userid]
-    );
-    
-    const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+
+    const user = await prisma.user_table.findUnique({
+      where: { userid },
+      select: { first_time_insertion: true },
+    });
+
+    const isInitialExtraction = user?.first_time_insertion ?? true;
     sageRouteLogger.info({ userid, isInitialExtraction }, "Starting Sage data extraction");
 
     const companyid = req.session.user.companyid;
@@ -256,10 +251,6 @@ router.post("/start-profit-loss-process", async (req, res) => {
       success: false,
       error: "Failed to start profit and loss process: " + error.message,
     });
-  } finally {
-    if (db) {
-      await closeDb(db);
-    }
   }
 });
 
@@ -278,22 +269,18 @@ router.get("/sagecompany", (req, res) => {
 });
 
 router.post("/check-user-exists", async (req, res) => {
-  let db;
+  const prisma = getPrismaClient();
   try {
-    db = await connectDb();
     const { email } = req.body;
-    const result = await db.query("SELECT * FROM user_table WHERE email = $1", [
-      email,
-    ]);
-    sageRouteLogger.debug({ email, exists: result.rows.length > 0 }, "Checked if user exists");
-    res.json({ exists: result.rows.length > 0 });
+    const existing = await prisma.user_table.findFirst({
+      where: { email },
+      select: { userid: true },
+    });
+    sageRouteLogger.debug({ email, exists: !!existing }, "Checked if user exists");
+    res.json({ exists: !!existing });
   } catch (err) {
     sageRouteLogger.error({ err, email: req.body.email }, "Error checking if user exists");
     res.json({ exists: false, error: err.message });
-  } finally {
-    if (db) {
-      await closeDb(db);
-    }
   }
 });
 

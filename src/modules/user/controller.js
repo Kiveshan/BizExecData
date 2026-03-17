@@ -1,4 +1,4 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 
 export async function getDashboard(req, res) {
   const roleId = req.session.roleid;
@@ -21,95 +21,92 @@ export async function getDashboard(req, res) {
 }
 
 export async function getCompanyData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
 
   try {
-    const result = await db.query(
-      "SELECT date, sumofsales, sumofcost, grossprofit FROM company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.company_calcs.findMany({
+      where: { userid },
+      select: { date: true, sumofsales: true, sumofcost: true, grossprofit: true },
+      orderBy: { date: "asc" },
+    });
+    const lastEntryDate = await prisma.company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getProfitData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      "SELECT date, grossprofit, opexpenses, netprofit FROM company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.company_calcs.findMany({
+      where: { userid },
+      select: { date: true, grossprofit: true, opexpenses: true, netprofit: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getRevenueData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      "SELECT date,revenue, category FROM revenue WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.revenue.findMany({
+      where: { userid },
+      select: { date: true, revenue: true, category: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getCostOfSalesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      "SELECT date, costofsales, category FROM costofsales WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.costofsales.findMany({
+      where: { userid },
+      select: { date: true, costofsales: true, category: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExpensesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      "SELECT date, expenses, category FROM expenses WHERE userid = $1 ORDER BY category",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.expenses.findMany({
+      where: { userid },
+      select: { date: true, expenses: true, category: true },
+      orderBy: { category: "asc" },
+    });
+    const lastEntryDate = await prisma.company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
