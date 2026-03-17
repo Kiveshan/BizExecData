@@ -67,7 +67,7 @@ router.post("/sagelogin", async (req, res) => {
 
         req.session.user = {
           userid: user.userid,
-          companyid: user.sage_company_id,
+          companyid: String(user.sage_company_id),
           email: user.email,
           password: encrypt(password),
         };
