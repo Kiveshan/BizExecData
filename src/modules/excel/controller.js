@@ -1,22 +1,58 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import xlsx from "xlsx";
 import { formatDate, formatExcelDate } from "../../utils/file.js";
 
+function toMonthRange(formattedDate) {
+  const normalized = String(formattedDate).trim().replaceAll("/", "-");
+  const ym = normalized.length >= 7 ? normalized.slice(0, 7) : normalized;
+  const [yearStr, monthStr] = ym.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error("Invalid formattedDate");
+  }
+
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const nextMonthStart = new Date(Date.UTC(year, month, 1));
+  return { start, nextMonthStart };
+}
+
+function toDbDate(value) {
+  if (value instanceof Date) return value;
+  const str = String(value ?? "").trim();
+  if (!str) throw new Error("Invalid date");
+
+  if (/^\d{4}[-/]\d{2}$/.test(str)) {
+    return toMonthRange(str).start;
+  }
+
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Invalid date");
+  }
+  return parsed;
+}
+
 export async function checkDateExistsInDb(formattedDate, req) {
   const userid = req.session.userid;
-  let db = await connectDb();
   try {
-    const checkQuery = {
-      text: `SELECT 1 FROM excel_companydata WHERE userid = $1 AND date::TEXT LIKE $2 LIMIT 1`,
-      values: [userid, `${formattedDate}%`],
-    };
-    const result = await db.query(checkQuery);
-    return result.rowCount > 0;
+    const prisma = getPrismaClient();
+    const { start, nextMonthStart } = toMonthRange(formattedDate);
+    const existing = await prisma.excel_companydata.findFirst({
+      where: {
+        userid,
+        date: {
+          gte: start,
+          lt: nextMonthStart,
+        },
+      },
+      select: { id: true },
+    });
+    return !!existing;
   } catch (err) {
     console.error("Error checking date in the database:", err.message);
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
@@ -73,8 +109,9 @@ export async function processTxtFile(content, req) {
 
 async function processFinancialData(data, req, formattedDate) {
   const userid = req.session.userid;
-  let db = await connectDb();
   try {
+    const prisma = getPrismaClient();
+    const dbDate = toDbDate(formattedDate);
     const categoryMap = {
       REVENUE: ["Gross sales"],
       "COST OF GOODS SOLD": [
@@ -147,18 +184,19 @@ async function processFinancialData(data, req, formattedDate) {
       }
 
       if (category) {
-        const insertQuery = {
-          text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                        VALUES ($1, $2, $3, $4, $5)`,
-          values: [userid, category, subcategory, amount, formattedDate],
-        };
-        await db.query(insertQuery);
+        await prisma.excel_companydata.create({
+          data: {
+            userid,
+            category,
+            subcategory,
+            amount,
+            date: dbDate,
+          },
+        });
       }
     }
   } catch (err) {
     console.error("Error inserting data into the database:", err.message);
-  } finally {
-    await closeDb(db);
   }
 }
 
@@ -195,8 +233,10 @@ export async function processAmendedExcelFile(buffer, req, res) {
 
 async function amendFinancialData(data, req, formattedDate, fullDate) {
   const userid = req.session.userid;
-  let db = await connectDb();
   try {
+    const prisma = getPrismaClient();
+    const { start, nextMonthStart } = toMonthRange(formattedDate);
+    const dbDate = toDbDate(fullDate);
     const categoryMap = {
       REVENUE: ["Gross sales"],
       "COST OF GOODS SOLD": [
@@ -269,159 +309,153 @@ async function amendFinancialData(data, req, formattedDate, fullDate) {
       }
 
       if (category) {
-        const existingQuery = {
-          text: `SELECT * FROM excel_companydata WHERE userid = $1 AND category = $2 AND subcategory = $3 AND date::TEXT LIKE $4`,
-          values: [userid, category, subcategory, `${formattedDate}%`],
-        };
+        const existing = await prisma.excel_companydata.findFirst({
+          where: {
+            userid,
+            category,
+            subcategory,
+            date: {
+              gte: start,
+              lt: nextMonthStart,
+            },
+          },
+          select: { id: true },
+        });
 
-        const existingRecord = await db.query(existingQuery);
-
-        if (existingRecord.rows.length > 0) {
-          const updateQuery = {
-            text: `UPDATE excel_companydata 
-                              SET amount = $1, date = $5 
-                              WHERE userid = $2 AND category = $3 AND subcategory = $4 AND date::TEXT LIKE $6`,
-            values: [amount, userid, category, subcategory, fullDate, `${formattedDate}%`],
-          };
-          await db.query(updateQuery);
+        if (existing) {
+          await prisma.excel_companydata.update({
+            where: { id: existing.id },
+            data: {
+              amount,
+              date: dbDate,
+            },
+          });
         } else {
-          const insertQuery = {
-            text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                              VALUES ($1, $2, $3, $4, $5)`,
-            values: [userid, category, subcategory, amount, fullDate],
-          };
-          await db.query(insertQuery);
+          await prisma.excel_companydata.create({
+            data: {
+              userid,
+              category,
+              subcategory,
+              amount,
+              date: dbDate,
+            },
+          });
         }
       }
     }
   } catch (err) {
     console.error("Error updating data in the database:", err.message);
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelCompanyData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `
+    const result = await prisma.$queryRaw`
       SELECT DATE(date) AS date,
              SUM(CASE WHEN subcategory = 'Net sales' THEN amount ELSE 0 END) AS netsales,
              SUM(CASE WHEN subcategory = 'Cost of goods sold' THEN amount ELSE 0 END) AS costofsales,
              SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit
-      FROM excel_companydata 
-      WHERE category = 'TOTAL' and userid = $1
+      FROM excel_companydata
+      WHERE category = 'TOTAL' and userid = ${userid}
       GROUP BY DATE(date)
       ORDER BY DATE(date);
-    `,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
+    `;
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
     res.json({
-      financialData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+      financialData: result,
+      lastEntryDate: lastEntryDate?.date || null,
     });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelProfitData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `
+    const result = await prisma.$queryRaw`
       SELECT DATE(date) AS date,
              SUM(CASE WHEN subcategory = 'Net income' THEN amount ELSE 0 END) AS netprofit,
              SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit,
              SUM(CASE WHEN subcategory = 'Total expenses' THEN amount ELSE 0 END) AS expenses,
              SUM(CASE WHEN subcategory = 'Total other income' THEN amount ELSE 0 END) AS otherincome
-     FROM excel_companydata 
-     WHERE category = 'TOTAL' and userid = $1
-     GROUP BY DATE(date)
-     ORDER BY DATE(date);
-   `,
-      [userid]
-    );
-    res.json(result.rows);
+      FROM excel_companydata
+      WHERE category = 'TOTAL' and userid = ${userid}
+      GROUP BY DATE(date)
+      ORDER BY DATE(date);
+    `;
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelExpensesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'EXPENSES' and userid = $1`,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "EXPENSES" },
+      select: { date: true, amount: true, subcategory: true },
+    });
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
     res.json({
-      expenseData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+      expenseData: result,
+      lastEntryDate: lastEntryDate?.date || null,
     });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelIncomeData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'OTHER INCOME' and userid = $1`,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "OTHER INCOME" },
+      select: { date: true, amount: true, subcategory: true },
+    });
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
     res.json({
-      incomeData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+      incomeData: result,
+      lastEntryDate: lastEntryDate?.date || null,
     });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelCostOfSalesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'COST OF GOODS SOLD' and userid = $1`,
-      [userid]
-    );
-    res.json(result.rows);
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "COST OF GOODS SOLD" },
+      select: { date: true, amount: true, subcategory: true },
+    });
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }

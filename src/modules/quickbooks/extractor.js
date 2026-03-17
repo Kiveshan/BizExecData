@@ -1,4 +1,4 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import { oauthClient } from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
@@ -18,89 +18,119 @@ export async function fetchProfitAndLoss(companyID, startOfMonth, endOfMonth) {
 }
 
 export async function upsertRevenue(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT revenue FROM revenue WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.revenue.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        revenue_id: true,
+        revenue: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].revenue);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE revenue SET revenue = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.revenue === null || existing.revenue === undefined ? null : Number(existing.revenue);
+      if (existingAmount !== Number(amount)) {
+        await prisma.revenue.update({
+          where: { revenue_id: existing.revenue_id },
+          data: { revenue: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO revenue (category, revenue, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.revenue.create({
+        data: {
+          category,
+          revenue: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
     moduleLogger.error({ err }, "Error upserting revenue data");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function upsertCOGS(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT costofsales FROM costofsales WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.costofsales.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        costofsalesid: true,
+        costofsales: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].costofsales);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE costofsales SET costofsales = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.costofsales === null || existing.costofsales === undefined ? null : Number(existing.costofsales);
+      if (existingAmount !== Number(amount)) {
+        await prisma.costofsales.update({
+          where: { costofsalesid: existing.costofsalesid },
+          data: { costofsales: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO costofsales (category, costofsales, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.costofsales.create({
+        data: {
+          category,
+          costofsales: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
     moduleLogger.error({ err }, "Error upserting revenue data");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function upsertExpenses(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT expenses FROM expenses WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.expenses.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        expenseid: true,
+        expenses: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].expenses);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE expenses SET expenses = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.expenses === null || existing.expenses === undefined ? null : Number(existing.expenses);
+      if (existingAmount !== Number(amount)) {
+        await prisma.expenses.update({
+          where: { expenseid: existing.expenseid },
+          data: { expenses: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO expenses (category, expenses, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.expenses.create({
+        data: {
+          category,
+          expenses: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
     moduleLogger.error({ err }, "Error upserting revenue data");
-  } finally {
-    await closeDb(db);
   }
 }
 
@@ -135,15 +165,14 @@ export async function findFinancialData(obj, userid, date, upsertFunction) {
 }
 
 export async function processQuickBooksData(userid) {
+  const prisma = getPrismaClient();
   try {
-    const db = await connectDb();
-    
-    const userResult = await db.query(
-      "SELECT first_time_insertion FROM user_table WHERE userid = $1",
-      [userid]
-    );
-    
-    const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+    const user = await prisma.user_table.findUnique({
+      where: { userid },
+      select: { first_time_insertion: true },
+    });
+
+    const isInitialExtraction = user?.first_time_insertion ?? true;
     moduleLogger.info({ userid, isInitialExtraction }, "Starting QuickBooks extraction");
     
     const currentDate = new Date();
@@ -204,47 +233,29 @@ export async function processQuickBooksData(userid) {
           const costOfGoodsSold =
             Number.parseFloat(obj["Total for Cost of Goods Sold"]) || 0;
 
-          const duplicateCheckQuery = `
-            SELECT * FROM company_calcs 
-            WHERE userid = $1 AND date = $2
-          `;
-          const duplicateCheckResult = await db.query(duplicateCheckQuery, [
-            userid,
-            endOfMonth,
-          ]);
+          const dbDate = endOfMonthDate;
+          const existing = await prisma.company_calcs.findFirst({
+            where: { userid, date: dbDate },
+            select: { calcid: true },
+          });
 
-          if (duplicateCheckResult.rowCount > 0) {
-            const updateQuery = `
-              UPDATE company_calcs 
-              SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5
-              WHERE userid = $6 AND date = $7
-            `;
-            const updateValues = [
-              grossProfit.toFixed(2),
-              Expense.toFixed(2),
-              netIncome.toFixed(2),
-              Income.toFixed(2),
-              costOfGoodsSold.toFixed(2),
-              userid,
-              endOfMonth,
-            ];
-            await db.query(updateQuery, updateValues);
+          const data = {
+            grossprofit: Number(grossProfit.toFixed(2)),
+            opexpenses: Number(Expense.toFixed(2)),
+            netprofit: Number(netIncome.toFixed(2)),
+            sumofsales: Number(Income.toFixed(2)),
+            sumofcost: Number(costOfGoodsSold.toFixed(2)),
+          };
+
+          if (existing) {
+            await prisma.company_calcs.update({
+              where: { calcid: existing.calcid },
+              data,
+            });
           } else {
-            const insertQuery = `
-              INSERT INTO company_calcs (
-                userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            `;
-            const insertValues = [
-              userid,
-              grossProfit.toFixed(2),
-              Expense.toFixed(2),
-              netIncome.toFixed(2),
-              Income.toFixed(2),
-              costOfGoodsSold.toFixed(2),
-              endOfMonth,
-            ];
-            await db.query(insertQuery, insertValues);
+            await prisma.company_calcs.create({
+              data: { userid, date: dbDate, ...data },
+            });
           }
         } catch (e) {
           moduleLogger.error({ startOfMonth, error: e }, "Error processing data for month");
@@ -255,10 +266,10 @@ export async function processQuickBooksData(userid) {
 
       await processAdditionalQuickBooksData(userid, companyID, isInitialExtraction);
 
-      await db.query(
-        "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
-        [userid]
-      );
+      await prisma.user_table.update({
+        where: { userid },
+        data: { first_time_insertion: false },
+      });
 
       extractionStatus.quickbooks[userid] = true;
 
@@ -268,8 +279,6 @@ export async function processQuickBooksData(userid) {
     } catch (error) {
       moduleLogger.error({ error }, "Error in QuickBooks data processing");
       extractionStatus.quickbooks[userid] = true;
-    } finally {
-      await closeDb(db);
     }
   } catch (error) {
     moduleLogger.error({ error }, "Error in processQuickBooksData");

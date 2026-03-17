@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
 import { oauthClient, oauth2_token_json, authurl, setOAuthToken } from "./client.js";
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import {
   fetchProfitAndLoss,
   findFinancialData,
@@ -36,12 +36,19 @@ router.get("/auth", (req, res) => {
 
 router.get(authurl, async (req, res) => {
   const date = new Date();
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     await oauthClient.createToken(req.url).then((authResponse) => {
       setOAuthToken(JSON.stringify(authResponse.json, null, 2));
     });
     const companyID = oauthClient.getToken().realmId;
+    const companyIdBigInt = (() => {
+      try {
+        return BigInt(companyID);
+      } catch {
+        return null;
+      }
+    })();
 
     const authResponse = await oauthClient.makeApiCall({
       url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=75`,
@@ -58,68 +65,78 @@ router.get(authurl, async (req, res) => {
 
     qbRouteLogger.info({ companyID, companyName, email }, "QuickBooks OAuth callback - company info extracted");
 
-    const existingUser = await db.query(
-      "SELECT * FROM user_table WHERE company_id = $1",
-      [companyID]
-    );
+    const existingUser = companyIdBigInt
+      ? await prisma.user_table.findFirst({
+          where: { company_id: companyIdBigInt },
+        })
+      : null;
 
-    const exsistingLicense = await db.query(
-      `SELECT * FROM license_management WHERE userid = $1 `,
-      [companyID]
-    );
+    const exsistingLicense = await prisma.license_management.findFirst({
+      where: {
+        userid: String(companyID),
+      },
+    });
 
-    if (existingUser.rows.length === 0) {
+    if (!existingUser) {
       qbRouteLogger.info({ companyID }, "New QuickBooks user registration");
-      const result = await db.query(
-        `INSERT INTO user_table (firstname, surname, company_id, company_name, email, address, company_services, first_time_insertion, accounting_software)
-         VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Quickbooks')
-         RETURNING company_id`,
-        [companyID, companyName, email, address, industryType, true]
-      );
-
-      const newUserId = result.rows[0].company_id;
       const currentDate = new Date();
 
-      await db.query(
-        `INSERT INTO license_management (owner_name, company_name, status, date_submitted, userid)
-        VALUES ('N/A', $1, 'Pending', $2, $3)`,
-        [companyName, currentDate, newUserId]
-      );
+      await prisma.user_table.create({
+        data: {
+          firstname: "N/A",
+          surname: "N/A",
+          company_id: companyIdBigInt,
+          company_name: companyName,
+          email,
+          address,
+          company_services: industryType,
+          first_time_insertion: true,
+          accounting_software: "Quickbooks",
+        },
+      });
+
+      await prisma.license_management.create({
+        data: {
+          owner_name: "N/A",
+          company_name: companyName,
+          status: "Pending",
+          date_submitted: currentDate,
+          userid: String(companyID),
+        },
+      });
 
       return res.redirect(
         `/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
       );
     }
     if (
-      existingUser.rows[0].status === "pending" ||
-      existingUser.rows[0].status === "rejected" ||
-      exsistingLicense.rows[0].status === "Pending" ||
-      exsistingLicense.rows[0].status === "Deactivated"
+      existingUser.status === "pending" ||
+      existingUser.status === "rejected" ||
+      exsistingLicense?.status === "Pending" ||
+      exsistingLicense?.status === "Deactivated"
     ) {
-      qbRouteLogger.warn({ userid: existingUser.rows[0].userid, status: existingUser.rows[0].status }, "QuickBooks user access denied");
+      qbRouteLogger.warn({ userid: existingUser.userid, status: existingUser.status }, "QuickBooks user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${existingUser.rows[0].status} and your License is ${exsistingLicense.rows[0].status}. Please contact our support team.`
+        `/index.html?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
       );
     }
 
     if (
-      existingUser.rows[0].status === "approved" &&
-      existingUser.rows[0].first_time_insertion === true &&
-      exsistingLicense.rows[0].status === "Paid"
+      existingUser.status === "approved" &&
+      existingUser.first_time_insertion === true &&
+      exsistingLicense?.status === "Paid"
     ) {
-      req.session.userid = existingUser.rows[0].userid;
-      qbRouteLogger.info({ userid: existingUser.rows[0].userid }, "QuickBooks user redirected to loading");
+      req.session.userid = existingUser.userid;
+      qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to loading");
       res.redirect(`/quickbooks-loading`);
     } else {
-      req.session.userid = existingUser.rows[0].userid;
-      qbRouteLogger.info({ userid: existingUser.rows[0].userid }, "QuickBooks user redirected to company");
+      req.session.userid = existingUser.userid;
+      qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to company");
       res.redirect("/company");
     }
   } catch (err) {
     qbRouteLogger.error({ err }, "Error during QuickBooks OAuth callback");
     res.status(500).send("Error occurred while fetching company data.");
-  } finally {
-    await closeDb(db);
   }
 });
 
@@ -131,7 +148,7 @@ router.get("/update", async (req, res) => {
   const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`;
   let date = new Date(startDate);
 
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   qbRouteLogger.info({ userid, companyID, startDate }, "QuickBooks update process started");
 
   while (date <= currentDate) {
@@ -179,47 +196,38 @@ router.get("/update", async (req, res) => {
       const costOfGoodsSold =
         parseFloat(obj["Total for Cost of Goods Sold"]) || 0;
 
-      const duplicateCheckQuery = `
-        SELECT * FROM company_calcs 
-        WHERE userid = $1 AND date = $2
-      `;
-      const duplicateCheckResult = await db.query(duplicateCheckQuery, [
-        userid,
-        endOfMonth,
-      ]);
+      const dbDate = endOfMonthDate;
+      const existing = await prisma.company_calcs.findFirst({
+        where: {
+          userid,
+          date: dbDate,
+        },
+        select: {
+          calcid: true,
+        },
+      });
 
-      if (duplicateCheckResult.rowCount > 0) {
-        const updateQuery = `
-          UPDATE company_calcs 
-          SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5
-          WHERE userid = $6 AND date = $7
-        `;
-        const updateValues = [
-          grossProfit.toFixed(2),
-          Expense.toFixed(2),
-          netIncome.toFixed(2),
-          Income.toFixed(2),
-          costOfGoodsSold.toFixed(2),
-          userid,
-          endOfMonth,
-        ];
-        await db.query(updateQuery, updateValues);
+      const data = {
+        grossprofit: Number(grossProfit.toFixed(2)),
+        opexpenses: Number(Expense.toFixed(2)),
+        netprofit: Number(netIncome.toFixed(2)),
+        sumofsales: Number(Income.toFixed(2)),
+        sumofcost: Number(costOfGoodsSold.toFixed(2)),
+      };
+
+      if (existing) {
+        await prisma.company_calcs.update({
+          where: { calcid: existing.calcid },
+          data,
+        });
       } else {
-        const insertQuery = `
-          INSERT INTO company_calcs (
-            userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `;
-        const insertValues = [
-          userid,
-          grossProfit.toFixed(2),
-          Expense.toFixed(2),
-          netIncome.toFixed(2),
-          Income.toFixed(2),
-          costOfGoodsSold.toFixed(2),
-          endOfMonth,
-        ];
-        await db.query(insertQuery, insertValues);
+        await prisma.company_calcs.create({
+          data: {
+            userid,
+            date: dbDate,
+            ...data,
+          },
+        });
       }
     } catch (e) {
       qbRouteLogger.error({ error: e, startOfMonth }, "Error processing QuickBooks data for month");
@@ -228,7 +236,6 @@ router.get("/update", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
-  await closeDb(db);
   qbRouteLogger.info({ userid }, "QuickBooks update process completed");
   res.redirect("/fetch-income");
 });
@@ -375,7 +382,7 @@ router.get("/fetch-otherincome", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
-  const db = await connectDb();
+  const prisma = getPrismaClient();
 
   qbRouteLogger.info({ userid, companyID }, "Fetching other income data from QuickBooks");
 
@@ -399,12 +406,12 @@ router.get("/fetch-otherincome", async (req, res) => {
 
     date.setMonth(date.getMonth() + 1);
   }
-  await db.query(
-    "UPDATE user_table SET first_time_insertion = false WHERE userid = $1",
-    [userid]
-  );
+
+  await prisma.user_table.update({
+    where: { userid },
+    data: { first_time_insertion: false },
+  });
   qbRouteLogger.info({ userid }, "QuickBooks initial extraction completed, first_time_insertion set to false");
-  await closeDb(db);
   res.redirect("/company");
 });
 

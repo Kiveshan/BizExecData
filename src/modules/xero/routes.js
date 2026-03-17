@@ -3,16 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import { xero } from "./client.js";
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import {
-  extractXeroSummaryData,
-  extractXeroExpenses,
-  extractXeroIncome,
-  extractXeroCostOfSales,
-  insertXeroSummaryData,
-  insertExpenses,
-  insertIncome,
-  insertCostofSales,
   processXeroData,
   extractionStatus,
 } from "./extractor.js";
@@ -39,7 +31,7 @@ router.get("/xero-connect", async (req, res) => {
 });
 
 router.get("/auth/xero/callback", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   xeroRouteLogger.info("Xero OAuth callback received");
   try {
     const tokenSet = await xero.apiCallback(req.url);
@@ -73,55 +65,65 @@ router.get("/auth/xero/callback", async (req, res) => {
 
     xeroRouteLogger.info({ companyId, companyName }, "Xero company info extracted");
 
-    const existingUser = await db.query(
-      "SELECT * FROM user_table WHERE xero_company_id = $1",
-      [companyId]
-    );
+    const existingUser = await prisma.user_table.findFirst({
+      where: { xero_company_id: companyId || null },
+    });
 
-    const exsistingLicense = await db.query(
-      `SELECT * FROM license_management WHERE userid = $1`,
-      [companyId]
-    );
+    const exsistingLicense = await prisma.license_management.findFirst({
+      where: { userid: String(companyId) },
+    });
 
-    if (existingUser.rows.length === 0) {
+    if (!existingUser) {
       xeroRouteLogger.info({ companyId }, "New Xero user registration");
-      const result = await db.query(
-        `INSERT INTO user_table (firstname, surname, xero_company_id, company_name, telephone, address, company_services, first_time_insertion, accounting_software)
-         VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Xero') RETURNING xero_company_id`,
-        [companyId, companyName, telephone, address, industryType, true]
-      );
-
-      const newUserId = result.rows[0].xero_company_id;
       const currentDate = new Date();
-      await db.query(
-        `INSERT INTO license_management(owner_name,company_name, status,date_submitted, userid)
-        VALUES ('N/A',$1,'Pending',$2,$3)`,
-        [companyName, currentDate, newUserId]
-      );
+
+      await prisma.user_table.create({
+        data: {
+          firstname: "N/A",
+          surname: "N/A",
+          xero_company_id: companyId || null,
+          company_name: companyName,
+          telephone,
+          address,
+          company_services: industryType,
+          first_time_insertion: true,
+          accounting_software: "Xero",
+        },
+      });
+
+      await prisma.license_management.create({
+        data: {
+          owner_name: "N/A",
+          company_name: companyName,
+          status: "Pending",
+          date_submitted: currentDate,
+          userid: String(companyId),
+        },
+      });
 
       return res.redirect(
         `/index.html?message=Thank you for registering with BizTech. Please wait for our admin to approve your account.`
       );
     }
 
-    const user = existingUser.rows[0];
-    const license = exsistingLicense.rows[0];
-    xeroRouteLogger.info({ userid: user.userid, status: user.status, licenseStatus: license.status }, "Existing Xero user login");
+    const user = existingUser;
+    const license = exsistingLicense;
+    xeroRouteLogger.info({ userid: user.userid, status: user.status, licenseStatus: license?.status }, "Existing Xero user login");
 
     if (
       user.status === "pending" ||
       user.status === "rejected" ||
-      license.status === "Pending" ||
-      license.status === "Deactivated"
+      license?.status === "Pending" ||
+      license?.status === "Deactivated"
     ) {
-      xeroRouteLogger.warn({ userid: user.userid, userStatus: user.status, licenseStatus: license.status }, "Xero user access denied");
+      xeroRouteLogger.warn({ userid: user.userid, userStatus: user.status, licenseStatus: license?.status }, "Xero user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${user.status} and your license is ${license.status}. Please contact our support team.`
+        `/index.html?message=Your account is ${user.status} and your license is ${license?.status}. Please contact our support team.`
       );
     }
 
     const isInitialExtraction = user.first_time_insertion;
-    if (isInitialExtraction === false && license.status === "Paid") {
+    if (isInitialExtraction === false && license?.status === "Paid") {
       req.session.userid = user.userid;
       xeroRouteLogger.info({ userid: user.userid }, "Xero user redirected to profit page");
       return res.redirect("/profit");
@@ -132,8 +134,6 @@ router.get("/auth/xero/callback", async (req, res) => {
   } catch (err) {
     xeroRouteLogger.error({ err }, "Error during Xero callback");
     res.send("Sorry, something went wrong");
-  } finally {
-    await closeDb(db);
   }
 });
 
@@ -222,106 +222,103 @@ router.get("/xerocompany", (req, res) => {
 });
 
 router.get("/api/xerocompany", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero company data");
 
   try {
-    const result = await db.query(
-      "SELECT date, sumofsales, sumofcost, grossprofit FROM xero_company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM xero_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    xeroRouteLogger.debug({ userid, rowCount: result.rows.length }, "Xero company data fetched");
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.xero_company_calcs.findMany({
+      where: { userid },
+      select: { date: true, sumofsales: true, sumofcost: true, grossprofit: true },
+      orderBy: { date: "asc" },
+    });
+    const lastEntryDate = await prisma.xero_company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    xeroRouteLogger.debug({ userid, rowCount: data.length }, "Xero company data fetched");
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
     xeroRouteLogger.error({ err, userid }, "Error fetching Xero company data");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 });
 
 router.get("/api/xeroprofit", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero profit data");
   try {
-    const result = await db.query(
-      "SELECT date, grossprofit, opexpenses, netprofit FROM xero_company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    xeroRouteLogger.debug({ userid, rowCount: result.rows.length }, "Xero profit data fetched");
-    res.json(result.rows);
+    const data = await prisma.xero_company_calcs.findMany({
+      where: { userid },
+      select: { date: true, grossprofit: true, opexpenses: true, netprofit: true },
+      orderBy: { date: "asc" },
+    });
+    xeroRouteLogger.debug({ userid, rowCount: data.length }, "Xero profit data fetched");
+    res.json(data);
   } catch (err) {
     xeroRouteLogger.error({ err, userid }, "Error fetching Xero profit data");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 });
 
 router.get("/api/xeroexpenses", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero expenses data");
   try {
-    const result = await db.query(
-      "SELECT date, amount, category FROM xero_expenses WHERE userid = $1 ORDER BY category",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM xero_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    xeroRouteLogger.debug({ userid, rowCount: result.rows.length }, "Xero expenses data fetched");
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.xero_expenses.findMany({
+      where: { userid },
+      select: { date: true, amount: true, category: true },
+      orderBy: { category: "asc" },
+    });
+    const lastEntryDate = await prisma.xero_company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    xeroRouteLogger.debug({ userid, rowCount: data.length }, "Xero expenses data fetched");
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
     xeroRouteLogger.error({ err, userid }, "Error fetching Xero expenses data");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 });
 
 router.get("/api/xerorevenue", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero revenue data");
   try {
-    const result = await db.query(
-      "SELECT date,category , revenue FROM xero_revenue WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    xeroRouteLogger.debug({ userid, rowCount: result.rows.length }, "Xero revenue data fetched");
-    res.json(result.rows);
+    const data = await prisma.xero_revenue.findMany({
+      where: { userid },
+      select: { date: true, category: true, revenue: true },
+      orderBy: { date: "asc" },
+    });
+    xeroRouteLogger.debug({ userid, rowCount: data.length }, "Xero revenue data fetched");
+    res.json(data);
   } catch (err) {
     xeroRouteLogger.error({ err, userid }, "Error fetching Xero revenue data");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 });
 
 router.get("/api/xerocostofsales", async (req, res) => {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero cost of sales data");
   try {
-    const result = await db.query(
-      "SELECT date, costofsales FROM xero_costofsales WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    xeroRouteLogger.debug({ userid, rowCount: result.rows.length }, "Xero cost of sales data fetched");
-    res.json(result.rows);
+    const data = await prisma.xero_costofsales.findMany({
+      where: { userid },
+      select: { date: true, costofsales: true },
+      orderBy: { date: "asc" },
+    });
+    xeroRouteLogger.debug({ userid, rowCount: data.length }, "Xero cost of sales data fetched");
+    res.json(data);
   } catch (err) {
     xeroRouteLogger.error({ err, userid }, "Error fetching Xero cost of sales data");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 });
 
