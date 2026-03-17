@@ -134,11 +134,14 @@ export async function getCompanyData(username, password) {
   }
 }
 
-export function generateMonthlyDateRanges(startYear = 2024, startMonth = 0) {
+export function generateMonthlyDateRanges(isInitialExtraction = true, startMonth = 0) {
   const dateRanges = [];
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentYear - yearsBack;
+  console.log(`[Sage] Generating date ranges (${isInitialExtraction ? 'initial' : 'update'}): ${startYear}-01 to ${currentYear}-${currentMonth + 1}`);
 
   for (let year = startYear; year <= currentYear; year++) {
     const firstMonth = year === startYear ? startMonth : 0;
@@ -236,7 +239,7 @@ export async function processMonthlyData(
     const db = await connectDb();
     try {
       await db.query(
-        "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
+        "UPDATE user_table SET first_time_insertion = false WHERE userid = $1",
         [userid]
       );
     } finally {

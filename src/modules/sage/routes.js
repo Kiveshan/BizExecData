@@ -67,7 +67,7 @@ router.post("/sagelogin", async (req, res) => {
           password: encrypt(password),
         };
 
-        if (result.rows[0].first_time_insertion == false) {
+        if (result.rows[0].first_time_insertion == true) {
           return res.redirect("/extract-profit-loss");
         }
 
@@ -134,7 +134,7 @@ router.post("/sagelogin", async (req, res) => {
         companyData.companyData.Name,
         companyData.companyData.Telephone,
         full_address,
-        false,
+        true,
         email,
         hashedPassword,
       ]
@@ -196,6 +196,7 @@ router.get("/check-extraction-complete", (req, res) => {
 });
 
 router.post("/start-profit-loss-process", async (req, res) => {
+  let db;
   try {
     if (!req.session.user) {
       return res.status(401).json({
@@ -204,12 +205,21 @@ router.post("/start-profit-loss-process", async (req, res) => {
       });
     }
 
-    const companyid = req.session.user.companyid;
+    db = await connectDb();
     const userid = req.session.user.userid;
+    
+    const userResult = await db.query(
+      "SELECT first_time_insertion FROM user_table WHERE userid = $1",
+      [userid]
+    );
+    
+    const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+
+    const companyid = req.session.user.companyid;
     const email = req.session.user.email;
     const encryptedPassword = req.session.user.password;
 
-    const dateRanges = generateMonthlyDateRanges(2024, 0);
+    const dateRanges = generateMonthlyDateRanges(isInitialExtraction, 0);
     processMonthlyData(userid, dateRanges, companyid, email, encryptedPassword);
 
     res.json({
@@ -222,6 +232,10 @@ router.post("/start-profit-loss-process", async (req, res) => {
       success: false,
       error: "Failed to start profit and loss process: " + error.message,
     });
+  } finally {
+    if (db) {
+      await closeDb(db);
+    }
   }
 });
 

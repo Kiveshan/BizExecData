@@ -77,7 +77,7 @@ router.get("/auth/xero/callback", async (req, res) => {
       const result = await db.query(
         `INSERT INTO user_table (firstname, surname, xero_company_id, company_name, telephone, address, company_services, first_time_insertion, accounting_software)
          VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Xero') RETURNING xero_company_id`,
-        [companyId, companyName, telephone, address, industryType, false]
+        [companyId, companyName, telephone, address, industryType, true]
       );
 
       const newUserId = result.rows[0].xero_company_id;
@@ -107,11 +107,8 @@ router.get("/auth/xero/callback", async (req, res) => {
       );
     }
 
-    if (
-      user.status === "approved" &&
-      user.first_time_insertion === false &&
-      license.status === "Paid"
-    ) {
+    const isInitialExtraction = user.first_time_insertion;
+    if (isInitialExtraction === false && license.status === "Paid") {
       req.session.userid = user.userid;
       return res.redirect("/profit");
     }
