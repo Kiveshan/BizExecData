@@ -166,16 +166,25 @@ export async function processXeroData(userid) {
   let db;
   try {
     db = await connectDb();
+    
+    const userResult = await db.query(
+      "SELECT first_time_insertion FROM user_table WHERE userid = $1",
+      [userid]
+    );
+    
+    const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+    console.log(`[Xero] Starting ${isInitialExtraction ? 'initial' : 'update'} extraction for userid: ${userid}`);
 
     if (!xero.tenants || xero.tenants.length === 0) {
       throw new Error("No tenants available. Please connect to Xero first.");
     }
 
     const tenantId = xero.tenants[0].tenantId;
-    const startYear = 2024;
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
+    const startYear = isInitialExtraction ? currentYear - 3 : currentYear - 1;
+    console.log(`[Xero] Date range: ${startYear}-01-01 to ${currentYear}-${currentMonth}-${new Date(currentYear, currentMonth, 0).getDate()}`);
 
     for (let year = startYear; year <= currentYear; year++) {
       const endMonth = year === currentYear ? currentMonth : 12;
@@ -305,7 +314,7 @@ export async function processXeroData(userid) {
     }
 
     await db.query(
-      "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
+      "UPDATE user_table SET first_time_insertion = false WHERE userid = $1",
       [userid]
     );
 

@@ -133,13 +133,23 @@ export async function findFinancialData(obj, userid, date, upsertFunction) {
 
 export async function processQuickBooksData(userid) {
   try {
+    const db = await connectDb();
+    
+    const userResult = await db.query(
+      "SELECT first_time_insertion FROM user_table WHERE userid = $1",
+      [userid]
+    );
+    
+    const isInitialExtraction = userResult.rows.length > 0 ? userResult.rows[0].first_time_insertion : true;
+    console.log(`[QuickBooks] Starting ${isInitialExtraction ? 'initial' : 'update'} extraction for userid: ${userid}`);
+    
     const currentDate = new Date();
-    const oneYearAgo = currentDate.getFullYear() - 1;
-    const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`;
+    const yearsBack = isInitialExtraction ? 3 : 1;
+    const startYear = currentDate.getFullYear() - yearsBack;
+    const startDate = `${startYear}-${currentDate.getMonth() + 1}-01`;
     const date = new Date(startDate);
     const companyID = oauthClient.getToken().realmId;
-
-    const db = await connectDb();
+    console.log(`[QuickBooks] Date range: ${startDate} to ${currentDate.toISOString().split('T')[0]}`);
 
     try {
       while (date <= currentDate) {
@@ -240,7 +250,7 @@ export async function processQuickBooksData(userid) {
         date.setMonth(date.getMonth() + 1);
       }
 
-      await processAdditionalQuickBooksData(userid, companyID);
+      await processAdditionalQuickBooksData(userid, companyID, isInitialExtraction);
 
       await db.query(
         "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
@@ -264,21 +274,24 @@ export async function processQuickBooksData(userid) {
   }
 }
 
-async function processAdditionalQuickBooksData(userid, companyID) {
+async function processAdditionalQuickBooksData(userid, companyID, isInitialExtraction) {
   try {
-    await processIncomeData(userid, companyID);
-    await processCostData(userid, companyID);
-    await processExpensesData(userid, companyID);
-    await processOtherIncomeData(userid, companyID);
+    await processIncomeData(userid, companyID, isInitialExtraction);
+    await processCostData(userid, companyID, isInitialExtraction);
+    await processExpensesData(userid, companyID, isInitialExtraction);
+    await processOtherIncomeData(userid, companyID, isInitialExtraction);
   } catch (error) {
     console.error("Error processing additional QuickBooks data:", error);
     throw error;
   }
 }
 
-async function processIncomeData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processIncomeData(userid, companyID, isInitialExtraction = true) {
+  console.log(`[QuickBooks] Processing income data (${isInitialExtraction ? 'initial' : 'update'})`);
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -301,9 +314,12 @@ async function processIncomeData(userid, companyID) {
   }
 }
 
-async function processCostData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processCostData(userid, companyID, isInitialExtraction = true) {
+  console.log(`[QuickBooks] Processing cost data (${isInitialExtraction ? 'initial' : 'update'})`);
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -323,9 +339,12 @@ async function processCostData(userid, companyID) {
   }
 }
 
-async function processExpensesData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processExpensesData(userid, companyID, isInitialExtraction = true) {
+  console.log(`[QuickBooks] Processing expenses data (${isInitialExtraction ? 'initial' : 'update'})`);
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -348,9 +367,12 @@ async function processExpensesData(userid, companyID) {
   }
 }
 
-async function processOtherIncomeData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processOtherIncomeData(userid, companyID, isInitialExtraction = true) {
+  console.log(`[QuickBooks] Processing other income data (${isInitialExtraction ? 'initial' : 'update'})`);
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {

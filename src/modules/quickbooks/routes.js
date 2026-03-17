@@ -66,7 +66,7 @@ router.get(authurl, async (req, res) => {
         `INSERT INTO user_table (firstname, surname, company_id, company_name, email, address, company_services, first_time_insertion, accounting_software)
          VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Quickbooks')
          RETURNING company_id`,
-        [companyID, companyName, email, address, industryType, false]
+        [companyID, companyName, email, address, industryType, true]
       );
 
       const newUserId = result.rows[0].company_id;
@@ -95,7 +95,7 @@ router.get(authurl, async (req, res) => {
 
     if (
       existingUser.rows[0].status === "approved" &&
-      existingUser.rows[0].first_time_insertion === false &&
+      existingUser.rows[0].first_time_insertion === true &&
       exsistingLicense.rows[0].status === "Paid"
     ) {
       req.session.userid = existingUser.rows[0].userid;
@@ -373,7 +373,7 @@ router.get("/fetch-otherincome", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
   await db.query(
-    "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
+    "UPDATE user_table SET first_time_insertion = false WHERE userid = $1",
     [userid]
   );
   await closeDb(db);
