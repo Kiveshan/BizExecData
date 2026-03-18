@@ -215,34 +215,12 @@
                 <input type="password" id="password" name="password" placeholder="Password" required>
                 <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
             </div>
-            <div class="field-group">
-                <select name="accounting_software" id="accounting_software" required>
-                    <option value="">Select Accounting Software</option>
-                    <option value="quickbooks">QuickBooks</option>
-                    <option value="excel">Excel</option>
-                    <option value="zero">Zero</option>
-                </select>
-            </div>
-            <div class="additional-fields" id="quickbooks-fields">
-                <input type="text" name="clientid" placeholder="Client ID">
-                <input type="text" name="clientsecret" placeholder="Client Secret">
-                <input type="text" name="redirecturl" placeholder="Redirect URL">
-            </div>
+            <input type="hidden" name="accounting_software" value="excel">
             <input type="text" name="company_services" placeholder="Products/Services" class="full-width" required>
             <button type="submit">Create Account</button>
             <p>Already have an account? <a href="/login">Login</a></p>
         </form>
     </div>
 
-    <script>
-        document.getElementById('accounting_software').addEventListener('change', function() {
-            const additionalFields = document.getElementById('quickbooks-fields');
-            if (this.value === 'quickbooks') {
-                additionalFields.style.display = 'block';
-            } else {
-                additionalFields.style.display = 'none';
-            }
-        });
-    </script>
 </body>
 </html>
