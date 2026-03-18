@@ -296,6 +296,9 @@ async function amendFinancialData(rows, req, fileDate) {
     throw new Error(`Cannot amend financial data: ${err.message}`);
   }
 
+  // Track which subcategories are in the new Excel file
+  const subcategoriesInExcel = new Set(rows.map(r => r.subcategory));
+
   const ops = rows.map(({ category, subcategory, amount }) =>
     prisma.excel_companydata
       .findFirst({
@@ -322,8 +325,17 @@ async function amendFinancialData(rows, req, fileDate) {
 
   try {
     await Promise.all(ops);
+
+    // Delete records that exist in DB but not in the new Excel file
+    await prisma.excel_companydata.deleteMany({
+      where: {
+        userid,
+        date: { gte: start, lt: nextMonthStart },
+        subcategory: { notIn: Array.from(subcategoriesInExcel) },
+      },
+    });
   } catch (err) {
-    console.error("Error upserting financial data:", err.message);
+    console.error("Error upserting or deleting financial data:", err.message);
     throw err;
   }
 }
