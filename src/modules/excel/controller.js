@@ -346,39 +346,33 @@ export async function getExcelCompanyData(req, res) {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    // Fetch all TOTAL category data for this user, grouped by date
     const records = await prisma.excel_companydata.findMany({
       where: { userid, category: 'TOTAL' },
       select: { date: true, subcategory: true, amount: true },
-      orderBy: { date: 'asc' },
     });
 
-    // Aggregate by date using JavaScript
-    const grouped = new Map();
-    for (const record of records) {
-      const dateKey = record.date.toISOString().split('T')[0];
-      if (!grouped.has(dateKey)) {
-        grouped.set(dateKey, { date: record.date, netsales: 0, costofsales: 0, grossprofit: 0 });
+    const groupedByDate = {};
+    records.forEach(({ date, subcategory, amount }) => {
+      const dateKey = new Date(date).toISOString().split('T')[0];
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = { date: dateKey, netsales: 'R0.00', costofsales: 'R0.00', grossprofit: 'R0.00' };
       }
-      const entry = grouped.get(dateKey);
-      const sub = record.subcategory;
-      if (sub === 'Net sales') entry.netsales += record.amount;
-      else if (sub === 'Cost of goods sold') entry.costofsales += record.amount;
-      else if (sub === 'Gross profit') entry.grossprofit += record.amount;
-    }
+      const formattedAmount = `R${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (subcategory === 'Net sales') groupedByDate[dateKey].netsales = formattedAmount;
+      else if (subcategory === 'Cost of goods sold') groupedByDate[dateKey].costofsales = formattedAmount;
+      else if (subcategory === 'Gross profit') groupedByDate[dateKey].grossprofit = formattedAmount;
+    });
 
-    const result = Array.from(grouped.values());
-
+    const result = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
     const lastEntryDate = await prisma.excel_companydata.findFirst({
       where: { userid },
       select: { date: true },
-      orderBy: { date: 'desc' },
+      orderBy: { date: "desc" },
     });
-
     res.json({ financialData: result, lastEntryDate: lastEntryDate?.date || null });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Server Error');
+    res.status(500).send("Server Error");
   }
 }
 
@@ -386,39 +380,29 @@ export async function getExcelProfitData(req, res) {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    // Fetch all TOTAL category data for this user, grouped by date
     const records = await prisma.excel_companydata.findMany({
       where: { userid, category: 'TOTAL' },
       select: { date: true, subcategory: true, amount: true },
-      orderBy: { date: 'asc' },
     });
 
-    // Aggregate by date using JavaScript
-    const grouped = new Map();
-    for (const record of records) {
-      const dateKey = record.date.toISOString().split('T')[0];
-      if (!grouped.has(dateKey)) {
-        grouped.set(dateKey, {
-          date: record.date,
-          netprofit: 0,
-          grossprofit: 0,
-          expenses: 0,
-          otherincome: 0,
-        });
+    const groupedByDate = {};
+    records.forEach(({ date, subcategory, amount }) => {
+      const dateKey = new Date(date).toISOString().split('T')[0];
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = { date: dateKey, netprofit: 'R0.00', grossprofit: 'R0.00', expenses: 'R0.00', otherincome: 'R0.00' };
       }
-      const entry = grouped.get(dateKey);
-      const sub = record.subcategory;
-      if (sub === 'Net income') entry.netprofit += record.amount;
-      else if (sub === 'Gross profit') entry.grossprofit += record.amount;
-      else if (sub === 'Total expenses') entry.expenses += record.amount;
-      else if (sub === 'Total other income') entry.otherincome += record.amount;
-    }
+      const formattedAmount = `R${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (subcategory === 'Net income') groupedByDate[dateKey].netprofit = formattedAmount;
+      else if (subcategory === 'Gross profit') groupedByDate[dateKey].grossprofit = formattedAmount;
+      else if (subcategory === 'Total expenses') groupedByDate[dateKey].expenses = formattedAmount;
+      else if (subcategory === 'Total other income') groupedByDate[dateKey].otherincome = formattedAmount;
+    });
 
-    const result = Array.from(grouped.values());
+    const result = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
     res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Server Error');
+    res.status(500).send("Server Error");
   }
 }
 
