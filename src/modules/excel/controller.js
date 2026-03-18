@@ -346,25 +346,39 @@ export async function getExcelCompanyData(req, res) {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await prisma.$queryRaw`
-      SELECT DATE(date) AS date,
-             SUM(CASE WHEN subcategory = 'Net sales' THEN amount ELSE 0 END) AS netsales,
-             SUM(CASE WHEN subcategory = 'Cost of goods sold' THEN amount ELSE 0 END) AS costofsales,
-             SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit
-      FROM excel_companydata
-      WHERE category = 'TOTAL' AND userid = ${userid}
-      GROUP BY DATE(date)
-      ORDER BY DATE(date);
-    `;
+    // Fetch all TOTAL category data for this user, grouped by date
+    const records = await prisma.excel_companydata.findMany({
+      where: { userid, category: 'TOTAL' },
+      select: { date: true, subcategory: true, amount: true },
+      orderBy: { date: 'asc' },
+    });
+
+    // Aggregate by date using JavaScript
+    const grouped = new Map();
+    for (const record of records) {
+      const dateKey = record.date.toISOString().split('T')[0];
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, { date: record.date, netsales: 0, costofsales: 0, grossprofit: 0 });
+      }
+      const entry = grouped.get(dateKey);
+      const sub = record.subcategory;
+      if (sub === 'Net sales') entry.netsales += record.amount;
+      else if (sub === 'Cost of goods sold') entry.costofsales += record.amount;
+      else if (sub === 'Gross profit') entry.grossprofit += record.amount;
+    }
+
+    const result = Array.from(grouped.values());
+
     const lastEntryDate = await prisma.excel_companydata.findFirst({
       where: { userid },
       select: { date: true },
-      orderBy: { date: "desc" },
+      orderBy: { date: 'desc' },
     });
+
     res.json({ financialData: result, lastEntryDate: lastEntryDate?.date || null });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Server Error");
+    res.status(500).send('Server Error');
   }
 }
 
@@ -372,21 +386,39 @@ export async function getExcelProfitData(req, res) {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await prisma.$queryRaw`
-      SELECT DATE(date) AS date,
-             SUM(CASE WHEN subcategory = 'Net income' THEN amount ELSE 0 END) AS netprofit,
-             SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit,
-             SUM(CASE WHEN subcategory = 'Total expenses' THEN amount ELSE 0 END) AS expenses,
-             SUM(CASE WHEN subcategory = 'Total other income' THEN amount ELSE 0 END) AS otherincome
-      FROM excel_companydata
-      WHERE category = 'TOTAL' AND userid = ${userid}
-      GROUP BY DATE(date)
-      ORDER BY DATE(date);
-    `;
+    // Fetch all TOTAL category data for this user, grouped by date
+    const records = await prisma.excel_companydata.findMany({
+      where: { userid, category: 'TOTAL' },
+      select: { date: true, subcategory: true, amount: true },
+      orderBy: { date: 'asc' },
+    });
+
+    // Aggregate by date using JavaScript
+    const grouped = new Map();
+    for (const record of records) {
+      const dateKey = record.date.toISOString().split('T')[0];
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, {
+          date: record.date,
+          netprofit: 0,
+          grossprofit: 0,
+          expenses: 0,
+          otherincome: 0,
+        });
+      }
+      const entry = grouped.get(dateKey);
+      const sub = record.subcategory;
+      if (sub === 'Net income') entry.netprofit += record.amount;
+      else if (sub === 'Gross profit') entry.grossprofit += record.amount;
+      else if (sub === 'Total expenses') entry.expenses += record.amount;
+      else if (sub === 'Total other income') entry.otherincome += record.amount;
+    }
+
+    const result = Array.from(grouped.values());
     res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).send("Server Error");
+    res.status(500).send('Server Error');
   }
 }
 
