@@ -105,13 +105,10 @@ export async function register(req, res) {
     address,
     telephone,
     password,
-    accounting_software,
     company_services,
-    clientid,
-    clientsecret,
-    redirecturl,
   } = req.body;
 
+  const accounting_software = "excel";
   authControllerLogger.info({ email, company_name, accounting_software }, "Registration started");
 
   try {
@@ -149,14 +146,8 @@ export async function register(req, res) {
       throw new Error("Email is already in use");
     }
 
-    let roleId = 0;
-
     const hashedPassword = await hash(password, 10);
-    if (accounting_software == "excel") {
-      roleId = 4;
-    } else {
-      roleId = 1;
-    }
+    const roleId = 4;
 
     const createdUser = await prisma.user_table.create({
       data: {
