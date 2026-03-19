@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
 import { oauthClient, oauth2_token_json, authurl, setOAuthToken } from "./client.js";
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import {
   fetchProfitAndLoss,
   findFinancialData,
@@ -15,6 +15,9 @@ import {
   extractionStatus,
 } from "./extractor.js";
 import { formatDate } from "../../utils/file.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,21 +25,30 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 router.get("/auth", (req, res) => {
+  qbRouteLogger.debug("Initiating QuickBooks OAuth flow");
   const authUri = oauthClient.authorizeUri({
     scope: [OAuthClient.scopes.Accounting],
     state: "testState",
   });
+  qbRouteLogger.debug({ authUri }, "QuickBooks auth URI generated");
   res.redirect(authUri);
 });
 
 router.get(authurl, async (req, res) => {
   const date = new Date();
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     await oauthClient.createToken(req.url).then((authResponse) => {
       setOAuthToken(JSON.stringify(authResponse.json, null, 2));
     });
     const companyID = oauthClient.getToken().realmId;
+    const companyIdBigInt = (() => {
+      try {
+        return BigInt(companyID);
+      } catch {
+        return null;
+      }
+    })();
 
     const authResponse = await oauthClient.makeApiCall({
       url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=75`,
@@ -51,64 +63,80 @@ router.get(authurl, async (req, res) => {
       companyInfo.NameValue.find((nv) => nv.Name === "QBOIndustryType")?.Value ||
       "";
 
-    const existingUser = await db.query(
-      "SELECT * FROM user_table WHERE company_id = $1",
-      [companyID]
-    );
+    qbRouteLogger.info({ companyID, companyName, email }, "QuickBooks OAuth callback - company info extracted");
 
-    const exsistingLicense = await db.query(
-      `SELECT * FROM license_management WHERE userid = $1 `,
-      [companyID]
-    );
+    const existingUser = companyIdBigInt
+      ? await prisma.user_table.findFirst({
+          where: { company_id: companyIdBigInt },
+        })
+      : null;
 
-    if (existingUser.rows.length === 0) {
-      const result = await db.query(
-        `INSERT INTO user_table (firstname, surname, company_id, company_name, email, address, company_services, first_time_insertion, accounting_software)
-         VALUES ('N/A', 'N/A', $1, $2, $3, $4, $5, $6, 'Quickbooks')
-         RETURNING company_id`,
-        [companyID, companyName, email, address, industryType, false]
-      );
+    const exsistingLicense = await prisma.license_management.findFirst({
+      where: {
+        userid: String(companyID),
+      },
+    });
 
-      const newUserId = result.rows[0].company_id;
+    if (!existingUser) {
+      qbRouteLogger.info({ companyID }, "New QuickBooks user registration");
       const currentDate = new Date();
 
-      await db.query(
-        `INSERT INTO license_management (owner_name, company_name, status, date_submitted, userid)
-        VALUES ('N/A', $1, 'Pending', $2, $3)`,
-        [companyName, currentDate, newUserId]
-      );
+      await prisma.user_table.create({
+        data: {
+          firstname: "N/A",
+          surname: "N/A",
+          company_id: companyIdBigInt,
+          company_name: companyName,
+          email,
+          address,
+          company_services: industryType,
+          first_time_insertion: true,
+          accounting_software: "Quickbooks",
+        },
+      });
+
+      await prisma.license_management.create({
+        data: {
+          owner_name: "N/A",
+          company_name: companyName,
+          status: "Pending",
+          date_submitted: currentDate,
+          userid: String(companyID),
+        },
+      });
 
       return res.redirect(
         `/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
       );
     }
     if (
-      existingUser.rows[0].status === "pending" ||
-      existingUser.rows[0].status === "rejected" ||
-      exsistingLicense.rows[0].status === "Pending" ||
-      exsistingLicense.rows[0].status === "Deactivated"
+      existingUser.status === "pending" ||
+      existingUser.status === "rejected" ||
+      exsistingLicense?.status === "Pending" ||
+      exsistingLicense?.status === "Deactivated"
     ) {
+      qbRouteLogger.warn({ userid: existingUser.userid, status: existingUser.status }, "QuickBooks user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${existingUser.rows[0].status} and your License is ${exsistingLicense.rows[0].status}. Please contact our support team.`
+        `/index.html?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
       );
     }
 
     if (
-      existingUser.rows[0].status === "approved" &&
-      existingUser.rows[0].first_time_insertion === false &&
-      exsistingLicense.rows[0].status === "Paid"
+      existingUser.status === "approved" &&
+      existingUser.first_time_insertion === true &&
+      exsistingLicense?.status === "Paid"
     ) {
-      req.session.userid = existingUser.rows[0].userid;
+      req.session.userid = existingUser.userid;
+      qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to loading");
       res.redirect(`/quickbooks-loading`);
     } else {
-      req.session.userid = existingUser.rows[0].userid;
+      req.session.userid = existingUser.userid;
+      qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to company");
       res.redirect("/company");
     }
   } catch (err) {
-    console.error(err);
+    qbRouteLogger.error({ err }, "Error during QuickBooks OAuth callback");
     res.status(500).send("Error occurred while fetching company data.");
-  } finally {
-    await closeDb(db);
   }
 });
 
@@ -120,7 +148,8 @@ router.get("/update", async (req, res) => {
   const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`;
   let date = new Date(startDate);
 
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  qbRouteLogger.info({ userid, companyID, startDate }, "QuickBooks update process started");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -167,56 +196,47 @@ router.get("/update", async (req, res) => {
       const costOfGoodsSold =
         parseFloat(obj["Total for Cost of Goods Sold"]) || 0;
 
-      const duplicateCheckQuery = `
-        SELECT * FROM company_calcs 
-        WHERE userid = $1 AND date = $2
-      `;
-      const duplicateCheckResult = await db.query(duplicateCheckQuery, [
-        userid,
-        endOfMonth,
-      ]);
+      const dbDate = endOfMonthDate;
+      const existing = await prisma.company_calcs.findFirst({
+        where: {
+          userid,
+          date: dbDate,
+        },
+        select: {
+          calcid: true,
+        },
+      });
 
-      if (duplicateCheckResult.rowCount > 0) {
-        const updateQuery = `
-          UPDATE company_calcs 
-          SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5
-          WHERE userid = $6 AND date = $7
-        `;
-        const updateValues = [
-          grossProfit.toFixed(2),
-          Expense.toFixed(2),
-          netIncome.toFixed(2),
-          Income.toFixed(2),
-          costOfGoodsSold.toFixed(2),
-          userid,
-          endOfMonth,
-        ];
-        await db.query(updateQuery, updateValues);
+      const data = {
+        grossprofit: Number(grossProfit.toFixed(2)),
+        opexpenses: Number(Expense.toFixed(2)),
+        netprofit: Number(netIncome.toFixed(2)),
+        sumofsales: Number(Income.toFixed(2)),
+        sumofcost: Number(costOfGoodsSold.toFixed(2)),
+      };
+
+      if (existing) {
+        await prisma.company_calcs.update({
+          where: { calcid: existing.calcid },
+          data,
+        });
       } else {
-        const insertQuery = `
-          INSERT INTO company_calcs (
-            userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `;
-        const insertValues = [
-          userid,
-          grossProfit.toFixed(2),
-          Expense.toFixed(2),
-          netIncome.toFixed(2),
-          Income.toFixed(2),
-          costOfGoodsSold.toFixed(2),
-          endOfMonth,
-        ];
-        await db.query(insertQuery, insertValues);
+        await prisma.company_calcs.create({
+          data: {
+            userid,
+            date: dbDate,
+            ...data,
+          },
+        });
       }
     } catch (e) {
-      console.error(`Error processing data for ${startOfMonth}:`, e);
+      qbRouteLogger.error({ error: e, startOfMonth }, "Error processing QuickBooks data for month");
     }
 
     date.setMonth(date.getMonth() + 1);
   }
 
-  await closeDb(db);
+  qbRouteLogger.info({ userid }, "QuickBooks update process completed");
   res.redirect("/fetch-income");
 });
 
@@ -226,6 +246,8 @@ router.get("/fetch-income", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching income data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -240,7 +262,7 @@ router.get("/fetch-income", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting income data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -248,6 +270,7 @@ router.get("/fetch-income", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Income data fetch completed");
   res.redirect("/fetch-cost");
 });
 
@@ -257,6 +280,8 @@ router.get("/fetch-cost", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching cost data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -271,7 +296,7 @@ router.get("/fetch-cost", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting cost data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -279,6 +304,7 @@ router.get("/fetch-cost", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Cost data fetch completed");
   res.redirect("/fetch-expenses");
 });
 
@@ -288,6 +314,8 @@ router.get("/fetch-expenses", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching expenses data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -302,7 +330,7 @@ router.get("/fetch-expenses", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting expenses data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -310,6 +338,7 @@ router.get("/fetch-expenses", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Expenses data fetch completed");
   res.redirect("/fetch-otherexpenses");
 });
 
@@ -319,6 +348,8 @@ router.get("/fetch-otherexpenses", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching other expenses data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -333,7 +364,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting other expenses data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -341,6 +372,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
     date.setMonth(date.getMonth() + 1);
   }
 
+  qbRouteLogger.info({ userid }, "Other expenses data fetch completed");
   res.redirect("/fetch-otherincome");
 });
 
@@ -350,7 +382,9 @@ router.get("/fetch-otherincome", async (req, res) => {
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+
+  qbRouteLogger.info({ userid, companyID }, "Fetching other income data from QuickBooks");
 
   while (date <= currentDate) {
     const startOfMonth = formatDate(date);
@@ -365,25 +399,28 @@ router.get("/fetch-otherincome", async (req, res) => {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving transactions:", err);
+      qbRouteLogger.error({ err, startOfMonth }, "Error extracting other income data from QuickBooks");
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
 
     date.setMonth(date.getMonth() + 1);
   }
-  await db.query(
-    "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
-    [userid]
-  );
-  await closeDb(db);
+
+  await prisma.user_table.update({
+    where: { userid },
+    data: { first_time_insertion: false },
+  });
+  qbRouteLogger.info({ userid }, "QuickBooks initial extraction completed, first_time_insertion set to false");
   res.redirect("/company");
 });
 
 router.get("/quickbooks-loading", (req, res) => {
   if (!req.session.userid) {
+    qbRouteLogger.warn("Unauthorized access to quickbooks-loading page");
     return res.redirect("/login");
   }
+  qbRouteLogger.debug({ userid: req.session.userid }, "Serving QuickBooks loading page");
   res.render("profit-loss-loading", {
     source: "quickbooks",
     title: "Extracting QuickBooks Data",
@@ -394,6 +431,7 @@ router.get("/quickbooks-loading", (req, res) => {
 router.post("/start-quickbooks-extraction", async (req, res) => {
   try {
     if (!req.session.userid) {
+      qbRouteLogger.warn("Unauthorized QuickBooks extraction attempt");
       return res.status(401).json({
         success: false,
         error: "Not authenticated",
@@ -401,6 +439,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
     }
 
     const userid = req.session.userid;
+    qbRouteLogger.info({ userid }, "Starting QuickBooks data extraction");
     extractionStatus.quickbooks[userid] = false;
     processQuickBooksData(userid);
 
@@ -409,7 +448,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
       message: "Data extraction started",
     });
   } catch (error) {
-    console.error("Error starting QuickBooks extraction:", error);
+    qbRouteLogger.error({ error }, "Error starting QuickBooks extraction");
     res.status(500).json({
       success: false,
       error: "Failed to start QuickBooks extraction: " + error.message,
@@ -419,6 +458,7 @@ router.post("/start-quickbooks-extraction", async (req, res) => {
 
 router.get("/check-quickbooks-extraction", (req, res) => {
   if (!req.session.userid) {
+    qbRouteLogger.warn("Unauthorized check-quickbooks-extraction request");
     return res.status(401).json({
       complete: false,
       error: "Not authenticated",
@@ -426,37 +466,44 @@ router.get("/check-quickbooks-extraction", (req, res) => {
   }
 
   const userid = req.session.userid;
+  const status = extractionStatus.quickbooks[userid];
+  qbRouteLogger.debug({ userid, status }, "QuickBooks extraction status checked");
 
-  if (extractionStatus.quickbooks[userid] === undefined) {
+  if (status === undefined) {
     return res.json({ complete: true });
   }
 
-  res.json({ complete: extractionStatus.quickbooks[userid] });
+  res.json({ complete: status });
 });
 
 router.get("/quickbooks", (req, res) => {
   try {
     if (!oauth2_token_json) {
+      qbRouteLogger.debug("No OAuth token found, redirecting to auth");
       return res.redirect("/auth");
     }
 
     const token = oauth2_token_json;
 
     if (oauthClient.isAccessTokenValid()) {
+      qbRouteLogger.debug("Access token valid, serving quickbooks page");
       return res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
     }
 
+    qbRouteLogger.debug("Access token expired, refreshing token");
     oauthClient
       .refreshUsingToken(token.refresh_token)
       .then((authResponse) => {
         setOAuthToken(authResponse.getJson());
+        qbRouteLogger.debug("Token refreshed successfully");
         res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
       })
       .catch((err) => {
+        qbRouteLogger.error({ err }, "Error refreshing token");
         res.redirect("/auth");
       });
   } catch (error) {
-    console.error("Error during update:", error);
+    qbRouteLogger.error({ error }, "Error in quickbooks route");
     res.status(500).send("Update failed");
   }
 });

@@ -1,7 +1,10 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import { oauthClient } from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("quickbooks");
 
 export const extractionStatus = {
   quickbooks: {},
@@ -15,89 +18,119 @@ export async function fetchProfitAndLoss(companyID, startOfMonth, endOfMonth) {
 }
 
 export async function upsertRevenue(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT revenue FROM revenue WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.revenue.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        revenue_id: true,
+        revenue: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].revenue);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE revenue SET revenue = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.revenue === null || existing.revenue === undefined ? null : Number(existing.revenue);
+      if (existingAmount !== Number(amount)) {
+        await prisma.revenue.update({
+          where: { revenue_id: existing.revenue_id },
+          data: { revenue: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO revenue (category, revenue, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.revenue.create({
+        data: {
+          category,
+          revenue: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
-  } finally {
-    await closeDb(db);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   }
 }
 
 export async function upsertCOGS(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT costofsales FROM costofsales WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.costofsales.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        costofsalesid: true,
+        costofsales: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].costofsales);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE costofsales SET costofsales = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.costofsales === null || existing.costofsales === undefined ? null : Number(existing.costofsales);
+      if (existingAmount !== Number(amount)) {
+        await prisma.costofsales.update({
+          where: { costofsalesid: existing.costofsalesid },
+          data: { costofsales: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO costofsales (category, costofsales, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.costofsales.create({
+        data: {
+          category,
+          costofsales: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
-  } finally {
-    await closeDb(db);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   }
 }
 
 export async function upsertExpenses(category, amount, userid, date) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
+  const dbDate = date instanceof Date ? date : new Date(date);
   try {
-    const result = await db.query(
-      "SELECT expenses FROM expenses WHERE category = $1 AND userid = $2 AND date = $3",
-      [category, userid, date]
-    );
+    const existing = await prisma.expenses.findFirst({
+      where: {
+        category,
+        userid,
+        date: dbDate,
+      },
+      select: {
+        expenseid: true,
+        expenses: true,
+      },
+    });
 
-    if (result.rows.length > 0) {
-      const existingAmount = parseFloat(result.rows[0].expenses);
-      if (existingAmount !== parseFloat(amount)) {
-        await db.query(
-          "UPDATE expenses SET expenses = $1 WHERE category = $2 AND userid = $3 AND date = $4",
-          [amount, category, userid, date]
-        );
+    if (existing) {
+      const existingAmount = existing.expenses === null || existing.expenses === undefined ? null : Number(existing.expenses);
+      if (existingAmount !== Number(amount)) {
+        await prisma.expenses.update({
+          where: { expenseid: existing.expenseid },
+          data: { expenses: Number(amount) },
+        });
       }
     } else {
-      await db.query(
-        "INSERT INTO expenses (category, expenses, userid, date) VALUES ($1, $2, $3, $4)",
-        [category, amount, userid, date]
-      );
+      await prisma.expenses.create({
+        data: {
+          category,
+          expenses: Number(amount),
+          userid,
+          date: dbDate,
+        },
+      });
     }
   } catch (err) {
-    console.error("Error upserting data into database:", err);
-  } finally {
-    await closeDb(db);
+    moduleLogger.error({ err }, "Error upserting revenue data");
   }
 }
 
@@ -132,14 +165,23 @@ export async function findFinancialData(obj, userid, date, upsertFunction) {
 }
 
 export async function processQuickBooksData(userid) {
+  const prisma = getPrismaClient();
   try {
+    const user = await prisma.user_table.findUnique({
+      where: { userid },
+      select: { first_time_insertion: true },
+    });
+
+    const isInitialExtraction = user?.first_time_insertion ?? true;
+    moduleLogger.info({ userid, isInitialExtraction }, "Starting QuickBooks extraction");
+    
     const currentDate = new Date();
-    const oneYearAgo = currentDate.getFullYear() - 1;
-    const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`;
+    const yearsBack = isInitialExtraction ? 3 : 1;
+    const startYear = currentDate.getFullYear() - yearsBack;
+    const startDate = `${startYear}-${currentDate.getMonth() + 1}-01`;
     const date = new Date(startDate);
     const companyID = oauthClient.getToken().realmId;
-
-    const db = await connectDb();
+    moduleLogger.info({ startDate, endDate: currentDate.toISOString().split('T')[0] }, "QuickBooks date range");
 
     try {
       while (date <= currentDate) {
@@ -191,61 +233,43 @@ export async function processQuickBooksData(userid) {
           const costOfGoodsSold =
             Number.parseFloat(obj["Total for Cost of Goods Sold"]) || 0;
 
-          const duplicateCheckQuery = `
-            SELECT * FROM company_calcs 
-            WHERE userid = $1 AND date = $2
-          `;
-          const duplicateCheckResult = await db.query(duplicateCheckQuery, [
-            userid,
-            endOfMonth,
-          ]);
+          const dbDate = endOfMonthDate;
+          const existing = await prisma.company_calcs.findFirst({
+            where: { userid, date: dbDate },
+            select: { calcid: true },
+          });
 
-          if (duplicateCheckResult.rowCount > 0) {
-            const updateQuery = `
-              UPDATE company_calcs 
-              SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5
-              WHERE userid = $6 AND date = $7
-            `;
-            const updateValues = [
-              grossProfit.toFixed(2),
-              Expense.toFixed(2),
-              netIncome.toFixed(2),
-              Income.toFixed(2),
-              costOfGoodsSold.toFixed(2),
-              userid,
-              endOfMonth,
-            ];
-            await db.query(updateQuery, updateValues);
+          const data = {
+            grossprofit: Number(grossProfit.toFixed(2)),
+            opexpenses: Number(Expense.toFixed(2)),
+            netprofit: Number(netIncome.toFixed(2)),
+            sumofsales: Number(Income.toFixed(2)),
+            sumofcost: Number(costOfGoodsSold.toFixed(2)),
+          };
+
+          if (existing) {
+            await prisma.company_calcs.update({
+              where: { calcid: existing.calcid },
+              data,
+            });
           } else {
-            const insertQuery = `
-              INSERT INTO company_calcs (
-                userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            `;
-            const insertValues = [
-              userid,
-              grossProfit.toFixed(2),
-              Expense.toFixed(2),
-              netIncome.toFixed(2),
-              Income.toFixed(2),
-              costOfGoodsSold.toFixed(2),
-              endOfMonth,
-            ];
-            await db.query(insertQuery, insertValues);
+            await prisma.company_calcs.create({
+              data: { userid, date: dbDate, ...data },
+            });
           }
         } catch (e) {
-          console.error(`Error processing data for ${startOfMonth}:`, e);
+          moduleLogger.error({ startOfMonth, error: e }, "Error processing data for month");
         }
 
         date.setMonth(date.getMonth() + 1);
       }
 
-      await processAdditionalQuickBooksData(userid, companyID);
+      await processAdditionalQuickBooksData(userid, companyID, isInitialExtraction);
 
-      await db.query(
-        "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
-        [userid]
-      );
+      await prisma.user_table.update({
+        where: { userid },
+        data: { first_time_insertion: false },
+      });
 
       extractionStatus.quickbooks[userid] = true;
 
@@ -253,32 +277,33 @@ export async function processQuickBooksData(userid) {
         delete extractionStatus.quickbooks[userid];
       }, 60 * 60 * 1000);
     } catch (error) {
-      console.error("Error in QuickBooks data processing:", error);
+      moduleLogger.error({ error }, "Error in QuickBooks data processing");
       extractionStatus.quickbooks[userid] = true;
-    } finally {
-      await closeDb(db);
     }
   } catch (error) {
-    console.error("Error in processQuickBooksData:", error);
+    moduleLogger.error({ error }, "Error in processQuickBooksData");
     extractionStatus.quickbooks[userid] = true;
   }
 }
 
-async function processAdditionalQuickBooksData(userid, companyID) {
+async function processAdditionalQuickBooksData(userid, companyID, isInitialExtraction) {
   try {
-    await processIncomeData(userid, companyID);
-    await processCostData(userid, companyID);
-    await processExpensesData(userid, companyID);
-    await processOtherIncomeData(userid, companyID);
+    await processIncomeData(userid, companyID, isInitialExtraction);
+    await processCostData(userid, companyID, isInitialExtraction);
+    await processExpensesData(userid, companyID, isInitialExtraction);
+    await processOtherIncomeData(userid, companyID, isInitialExtraction);
   } catch (error) {
-    console.error("Error processing additional QuickBooks data:", error);
+    moduleLogger.error({ error }, "Error processing additional QuickBooks data");
     throw error;
   }
 }
 
-async function processIncomeData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processIncomeData(userid, companyID, isInitialExtraction = true) {
+  moduleLogger.info({ isInitialExtraction }, "Processing income data");
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -294,16 +319,19 @@ async function processIncomeData(userid, companyID) {
       );
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
-      console.error("Error extracting and saving income transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving income transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
   }
 }
 
-async function processCostData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processCostData(userid, companyID, isInitialExtraction = true) {
+  moduleLogger.info({ isInitialExtraction }, "Processing cost data");
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -316,16 +344,19 @@ async function processCostData(userid, companyID) {
       const costRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "COGS")]');
       await findFinancialData(costRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
-      console.error("Error extracting and saving cost transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving cost transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
   }
 }
 
-async function processExpensesData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processExpensesData(userid, companyID, isInitialExtraction = true) {
+  moduleLogger.info({ isInitialExtraction }, "Processing expenses data");
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -341,16 +372,19 @@ async function processExpensesData(userid, companyID) {
       );
       await findFinancialData(expenseRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
-      console.error("Error extracting and saving expense transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving expense transactions");
     }
 
     date.setMonth(date.getMonth() + 1);
   }
 }
 
-async function processOtherIncomeData(userid, companyID) {
-  const startDate = "2024-01-01";
+async function processOtherIncomeData(userid, companyID, isInitialExtraction = true) {
+  moduleLogger.info({ isInitialExtraction }, "Processing other income data");
   const currentDate = new Date();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentDate.getFullYear() - yearsBack;
+  const startDate = `${startYear}-01-01`;
   const date = new Date(startDate);
 
   while (date <= currentDate) {
@@ -371,7 +405,7 @@ async function processOtherIncomeData(userid, companyID) {
         upsertRevenue
       );
     } catch (err) {
-      console.error("Error extracting and saving other income transactions:", err);
+      moduleLogger.error({ err }, "Error extracting and saving other income transactions");
     }
 
     date.setMonth(date.getMonth() + 1);

@@ -14,6 +14,9 @@ import {
   getExcelIncomeData,
   getExcelCostOfSalesData,
 } from "./controller.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const excelRouteLogger = createModuleLogger("excel-routes");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,22 +24,27 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 router.get("/excel_dashboard", (req, res) => {
+  excelRouteLogger.debug("Serving excel_dashboard page");
   res.sendFile(path.join(__dirname, "..", "..", "..", "public", "excel_landing.html"));
 });
 
 router.get("/upload", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug({ userid: req.session?.userid }, "Serving upload page");
   res.render("upload.ejs", { errorMessage: null });
 });
 
 router.post("/upload", checkAuthenticated, async (req, res) => {
   if (!req.files || !req.files.file) {
+    excelRouteLogger.warn({ userid: req.session?.userid }, "No file uploaded");
     return res.status(400).send("No file uploaded.");
   }
 
   const uploadedFile = req.files.file;
   const extension = path.extname(uploadedFile.name).toLowerCase();
+  excelRouteLogger.info({ userid: req.session?.userid, filename: uploadedFile.name, extension }, "File upload started");
 
   if (!/xlsx|xls|xltx|txt/.test(extension)) {
+    excelRouteLogger.warn({ userid: req.session?.userid, extension }, "Invalid file type");
     return res.status(400).send("Invalid file type.");
   }
 
@@ -45,8 +53,17 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
     let formattedFileDate;
     if (/xlsx|xls|xltx/.test(extension)) {
       fileDate = extractDateFromExcel(uploadedFile.data);
-      const [DBfileYear, DBfileMonth] = fileDate.split("/");
-      formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
+      // Handle both Date objects and string formats
+      let year, month;
+      if (fileDate instanceof Date) {
+        year = fileDate.getFullYear();
+        month = fileDate.getMonth() + 1;
+      } else {
+        const parts = fileDate.split("/");
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+      }
+      formattedFileDate = `${year}-${String(month).padStart(2, "0")}`;
     }
 
     const currentDate = new Date();
@@ -58,6 +75,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       fileYear > currentYear ||
       (fileYear === currentYear && fileMonth > currentMonth)
     ) {
+      excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Future date upload rejected");
       return res.render("upload.ejs", {
         errorMessage: "Cannot upload a date from the future.",
       });
@@ -65,6 +83,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
 
     const dateExists = await checkDateExistsInDb(formattedFileDate, req);
     if (dateExists) {
+      excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Duplicate date upload rejected");
       return res.render("upload.ejs", {
         errorMessage: `File for the date ${fileDate} has already been uploaded.`,
       });
@@ -74,28 +93,38 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       const content = uploadedFile.data.toString("utf8");
       await processTxtFile(content, req);
     } else {
-      await processExcelFile(uploadedFile.data, req, res);
+      await processExcelFile(uploadedFile.data, req);
     }
+    excelRouteLogger.info({ userid: req.session?.userid, fileDate }, "File processed successfully");
     res.redirect("/excompany.html");
   } catch (error) {
-    console.error("Error processing file:", error);
-    res.status(500).send("Error processing file.");
+    excelRouteLogger.error({ 
+      error: error?.message || 'Unknown error', 
+      stack: error?.stack,
+      userid: req.session?.userid, 
+      filename: uploadedFile?.name 
+    }, "Error processing file");
+    res.status(500).send(`Error processing file: ${error?.message || 'Unknown error'}`);
   }
 });
 
 router.get("/amending", (req, res) => {
+  excelRouteLogger.debug("Serving amending page");
   res.render("amend", { errorMessage: null });
 });
 
 router.post("/amend", async (req, res) => {
   if (!req.files || !req.files.file) {
+    excelRouteLogger.warn("No file uploaded for amendment");
     return res.status(400).send("No file uploaded.");
   }
 
   const uploadedFile = req.files.file;
   const extension = path.extname(uploadedFile.name).toLowerCase();
+  excelRouteLogger.info({ filename: uploadedFile.name, extension }, "File amendment started");
 
   if (!/xlsx|xls|xltx|txt/.test(extension)) {
+    excelRouteLogger.warn({ extension }, "Invalid file type for amendment");
     return res.status(400).send("Invalid file type.");
   }
 
@@ -105,14 +134,24 @@ router.post("/amend", async (req, res) => {
 
     if (/xlsx|xls|xltx/.test(extension)) {
       fileDate = extractDateFromExcel(uploadedFile.data);
+      // Handle both Date objects and string formats
+      let year, month;
+      if (fileDate instanceof Date) {
+        year = fileDate.getFullYear();
+        month = fileDate.getMonth() + 1;
+      } else {
+        const parts = fileDate.split("/");
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+      }
+      formattedFileDate = `${year}-${String(month).padStart(2, "0")}`;
+
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1;
-      const [fileYear, fileMonth] = fileDate.split("/").map(Number);
-      const [DBfileYear, DBfileMonth] = fileDate.split("/");
-      formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
 
-      if (fileYear !== currentYear || fileMonth !== currentMonth) {
+      if (year !== currentYear || month !== currentMonth) {
+        excelRouteLogger.warn({ fileDate }, "Non-current date amendment rejected");
         return res.render("amend", {
           errorMessage: "Uploaded file is not from the current date.",
         });
@@ -127,6 +166,7 @@ router.post("/amend", async (req, res) => {
 
     const dateExists = await checkDateExistsInDb(formattedFileDate, req);
     if (!dateExists) {
+      excelRouteLogger.warn({ fileDate }, "Amendment rejected - date does not exist");
       return res.render("amend", {
         errorMessage: "File data does not exist. Please upload the document before amending.",
       });
@@ -136,11 +176,12 @@ router.post("/amend", async (req, res) => {
       const content = uploadedFile.data.toString("utf8");
       await processTxtFile(content, req);
     } else {
-      await processAmendedExcelFile(uploadedFile.data, req, res);
+      await processAmendedExcelFile(uploadedFile.data, req);
     }
+    excelRouteLogger.info({ fileDate }, "File amended successfully");
     res.redirect("/excel_dashboard");
   } catch (error) {
-    console.error("Error processing file:", error);
+    excelRouteLogger.error({ error, filename: uploadedFile.name }, "Error processing amendment");
     res.status(500).send("Error processing file.");
   }
 });

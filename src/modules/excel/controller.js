@@ -1,427 +1,462 @@
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import xlsx from "xlsx";
 import { formatDate, formatExcelDate } from "../../utils/file.js";
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes common subcategory names to match query expectations.
+ * Keys are case-insensitive patterns, values are the normalized form.
+ */
+const SUBCATEGORY_NORMALIZATION = {
+  // Company data totals
+  'net sales': 'Net sales',
+  'netsales': 'Net sales',
+  'cost of goods sold': 'Cost of goods sold',
+  'cogs': 'Cost of goods sold',
+  'gross profit': 'Gross profit',
+  'grossprofit': 'Gross profit',
+  // Profit data totals  
+  'net income': 'Net income',
+  'netincome': 'Net income',
+  'total expenses': 'Total expenses',
+  'totalexpenses': 'Total expenses',
+  'total other income': 'Total other income',
+  'totalotherincome': 'Total other income',
+  'other income': 'Total other income',
+};
+
+/**
+ * The recognised category header strings (col C, no amount on the row).
+ * Subcategories are inferred dynamically from the sheet — anything between
+ * two recognised headers belongs to the first one.
+ */
+const CATEGORY_HEADERS = new Set([
+  "REVENUE",
+  "COST OF GOODS SOLD",
+  "OTHER INCOME",
+  "EXPENSES",
+  "TOTAL",
+]);
+
+/**
+ * Total row indicators - these rows should be assigned to TOTAL category
+ * regardless of which section they appear in the Excel.
+ */
+const TOTAL_ROW_PATTERNS = [
+  'net sales',
+  'gross profit',
+  'cost of goods sold',
+  'total expenses',
+  'total other income',
+  'net income',
+  'net operating income',
+];
+
+function shouldBeTotalCategory(subcategory) {
+  const normalized = subcategory.toLowerCase().trim().replace(/\s+/g, ' ');
+  return TOTAL_ROW_PATTERNS.includes(normalized);
+}
+
+function normalizeSubcategory(label) {
+  const normalized = label.toLowerCase().trim().replace(/\s+/g, ' ');
+  return SUBCATEGORY_NORMALIZATION[normalized] || label.trim();
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function toMonthRange(formattedDate) {
+  const normalized = String(formattedDate).trim().replaceAll("/", "-");
+  const ym = normalized.length >= 7 ? normalized.slice(0, 7) : normalized;
+  const [yearStr, monthStr] = ym.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error(`Invalid formattedDate: "${formattedDate}"`);
+  }
+
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    nextMonthStart: new Date(Date.UTC(year, month, 1)),
+  };
+}
+
+function toDbDate(value) {
+  // Already a Date (e.g. when xlsx returns a datetime object)
+  if (value instanceof Date) return value;
+
+  const str = String(value ?? "").trim();
+  if (!str) throw new Error("Invalid date: empty value");
+
+  // "YYYY-MM" or "YYYY/MM" — treat as first of that month
+  if (/^\d{4}[-/]\d{2}$/.test(str)) {
+    return toMonthRange(str).start;
+  }
+
+  // Excel serial numbers handled by formatExcelDate before reaching here
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid date: "${str}"`);
+  return parsed;
+}
+
+// ─── Date existence check ─────────────────────────────────────────────────────
+
 export async function checkDateExistsInDb(formattedDate, req) {
   const userid = req.session.userid;
-  let db = await connectDb();
   try {
-    const checkQuery = {
-      text: `SELECT 1 FROM excel_companydata WHERE userid = $1 AND date::TEXT LIKE $2 LIMIT 1`,
-      values: [userid, `${formattedDate}%`],
-    };
-    const result = await db.query(checkQuery);
-    return result.rowCount > 0;
+    const prisma = getPrismaClient();
+    const { start, nextMonthStart } = toMonthRange(formattedDate);
+    const existing = await prisma.excel_companydata.findFirst({
+      where: { userid, date: { gte: start, lt: nextMonthStart } },
+      select: { id: true },
+    });
+    return !!existing;
   } catch (err) {
     console.error("Error checking date in the database:", err.message);
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
+// ─── Excel parsing helpers ────────────────────────────────────────────────────
+
+/**
+ * Extracts the report date from cell F3.
+ * Handles both native Date objects (openpyxl-style) and Excel serial numbers.
+ */
 export function extractDateFromExcel(buffer) {
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = xlsx.read(buffer, { type: "buffer", cellDates: true });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const dateCell = sheet["F3"];
 
-  if (!dateCell) {
-    throw new Error("No date found in cell F3.");
-  }
+  if (!dateCell) throw new Error("No date found in cell F3.");
 
-  const rawDate = dateCell.v;
-  return formatExcelDate(rawDate);
+  const raw = dateCell.v;
+  if (raw instanceof Date) return raw;
+  return formatExcelDate(raw);
 }
 
-export async function processExcelFile(buffer, req, res) {
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const dateCell = sheet["F3"];
-  let rawDate = dateCell ? dateCell.v : null;
+/**
+ * Reads the Income Statement sheet and returns structured rows:
+ * [{ category, subcategory, amount }]
+ *
+ * Layout convention:
+ *   Column C — label: either a known category header (no amount) or a subcategory
+ *   Column E — manually entered input values
+ *   Column F — formula-computed values (Net sales, COGS, totals, etc.)
+ *
+ * Category assignment is dynamic: we walk rows top-to-bottom and track the
+ * most recently seen CATEGORY_HEADERS header. Every subsequent row that has
+ * an amount is assigned to that category. No static subcategory list needed.
+ *
+ * Col F is preferred over col E so formula-computed totals are captured
+ * correctly regardless of whether the file was saved with cached values.
+ */
+function parseIncomeStatementRows(sheet) {
+  const rows = [];
 
-  if (rawDate) {
-    let formattedDate = formatExcelDate(rawDate);
-    let jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-    jsonData = jsonData
-      .filter((row) =>
-        row.some(
-          (cell) =>
-            cell !== undefined && cell !== null && cell.toString().trim() !== ""
-        )
-      )
-      .map((row) =>
-        row.map((cell) =>
-          cell !== undefined && cell !== null ? cell.toString().trim() : ""
-        )
-      )
-      .filter((row) => row.length > 2);
+  const ref = sheet["!ref"];
+  if (!ref) return rows;
 
-    await processFinancialData(jsonData, req, formattedDate);
+  const range = xlsx.utils.decode_range(ref);
+  let currentCategory = null;
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const labelCell = sheet[xlsx.utils.encode_cell({ r, c: 2 })]; // col C
+    if (!labelCell || typeof labelCell.v !== "string") continue;
+
+    const label = labelCell.v.trim();
+    if (!label) continue;
+
+    // Check if this row is a category header (uppercase, no amount columns)
+    if (CATEGORY_HEADERS.has(label.toUpperCase())) {
+      currentCategory = label.toUpperCase();
+      continue;
+    }
+
+    // No category seen yet — skip until we hit the first header
+    if (!currentCategory) continue;
+
+    const colECell = sheet[xlsx.utils.encode_cell({ r, c: 4 })]; // col E
+    const colFCell = sheet[xlsx.utils.encode_cell({ r, c: 5 })]; // col F
+
+    const colFValue = colFCell && typeof colFCell.v === "number" ? colFCell.v : null;
+    const colEValue = colECell && typeof colECell.v === "number" ? colECell.v : null;
+
+    const amount = colFValue ?? colEValue;
+    if (amount === null) continue;
+
+    const normalizedSubcategory = normalizeSubcategory(label);
+    // Summary/total rows go to TOTAL category regardless of current section
+    const finalCategory = shouldBeTotalCategory(normalizedSubcategory) ? "TOTAL" : currentCategory;
+    rows.push({ category: finalCategory, subcategory: normalizedSubcategory, amount });
   }
+
+  return rows;
+}
+
+// ─── Public file processors ───────────────────────────────────────────────────
+
+export async function processExcelFile(buffer, req) {
+  const workbook = xlsx.read(buffer, { type: "buffer", cellDates: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  const dateCell = sheet["F3"];
+  if (!dateCell) throw new Error("No date found in cell F3.");
+
+  // Accept native Date or fall back to formatExcelDate for serial numbers
+  const fileDate =
+    dateCell.v instanceof Date ? dateCell.v : formatExcelDate(dateCell.v);
+
+  const rows = parseIncomeStatementRows(sheet);
+  await processFinancialData(rows, req, fileDate);
 }
 
 export async function processTxtFile(content, req) {
+  // TXT files don't have category headers - we need to extract date from content
+  // For now, use current date as fallback
+  const fileDate = new Date();
+
   const lines = content
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line !== "");
+    .filter(Boolean);
 
-  const parsedData = lines.map((line) => line.split(/\s{2,}/));
-  await processFinancialData(parsedData, req);
+  // TXT files: split on 2+ spaces, first string = subcategory, first number = amount
+  // All TXT entries go to EXPENSES category (or could be configurable)
+  const rows = lines.flatMap((line) => {
+    const parts = line.split(/\s{2,}/);
+    const subcategory = parts.find((p) => isNaN(Number(p)))?.trim();
+    const amount = parseFloat(parts.find((p) => !isNaN(Number(p)) && p !== ""));
+    if (!subcategory || isNaN(amount)) return [];
+    return [{ category: "EXPENSES", subcategory, amount }];
+  });
+
+  await processFinancialData(rows, req, fileDate);
 }
 
-async function processFinancialData(data, req, formattedDate) {
-  const userid = req.session.userid;
-  let db = await connectDb();
-  try {
-    const categoryMap = {
-      REVENUE: ["Gross sales"],
-      "COST OF GOODS SOLD": [
-        "Beginning inventory",
-        "Add: Purchases",
-        "Freight-in",
-        "Direct labor",
-        "Indirect expenses",
-        "Less: ending inventory",
-      ],
-      "OTHER INCOME": ["Gain on sale of assets", "Interest income"],
-      EXPENSES: [
-        "Advertising",
-        "Amortization",
-        "Bad debts",
-        "Bank charges",
-        "Charitable contributions",
-        "Commissions",
-        "Contract labor",
-        "Depreciation",
-        "Dues and subscriptions",
-        "Employee benefit programs",
-        "Insurance",
-        "Interest",
-        "Legal and professional fees",
-        "Licenses and fees",
-        "Miscellaneous",
-        "Office expenses",
-        "Payroll taxes",
-        "Postage",
-        "Rent",
-        "Repairs and maintenance",
-        "Supplies",
-        "Telephone",
-        "Travel",
-        "Utilities",
-        "Vehicle expenses",
-        "Wages",
-      ],
-      TOTAL: [
-        "Total Other Income",
-        "Total expenses",
-        "Cost of goods sold",
-        "Net income",
-        "Gross profit",
-        "Net sales",
-      ],
-    };
+export async function processAmendedExcelFile(buffer, req) {
+  const workbook = xlsx.read(buffer, { type: "buffer", cellDates: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    for (let row of data) {
-      if (!row || row.length < 2) continue;
-
-      const subcategory = row.find((cell) => typeof cell === "string")?.trim();
-      const amount = parseFloat(
-        row.find((cell) => !isNaN(cell) && cell !== null && cell !== undefined)
-      );
-
-      if (!subcategory || isNaN(amount)) continue;
-
-      let category = "";
-      for (let cat in categoryMap) {
-        if (
-          categoryMap[cat].some((subcat) =>
-            new RegExp(subcat, "i").test(subcategory)
-          )
-        ) {
-          category = cat;
-          break;
-        }
-      }
-
-      if (category) {
-        const insertQuery = {
-          text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                        VALUES ($1, $2, $3, $4, $5)`,
-          values: [userid, category, subcategory, amount, formattedDate],
-        };
-        await db.query(insertQuery);
-      }
-    }
-  } catch (err) {
-    console.error("Error inserting data into the database:", err.message);
-  } finally {
-    await closeDb(db);
-  }
-}
-
-export async function processAmendedExcelFile(buffer, req, res) {
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
   const dateCell = sheet["F3"];
-  let rawDate = dateCell ? dateCell.v : null;
+  if (!dateCell) throw new Error("No date found in cell F3.");
 
-  if (rawDate) {
-    let formattedDate = formatExcelDate(rawDate);
-    const [DBfileYear, DBfileMonth] = formattedDate.split("/");
-    const formattedFileDate = `${DBfileYear}-${DBfileMonth}`;
+  const fileDate =
+    dateCell.v instanceof Date ? dateCell.v : formatExcelDate(dateCell.v);
 
-    let jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-    jsonData = jsonData
-      .filter((row) =>
-        row.some(
-          (cell) =>
-            cell !== undefined && cell !== null && cell.toString().trim() !== ""
-        )
-      )
-      .map((row) =>
-        row.map((cell) =>
-          cell !== undefined && cell !== null ? cell.toString().trim() : ""
-        )
-      )
-      .filter((row) => row.length > 2);
-
-    await amendFinancialData(jsonData, req, formattedFileDate, formattedDate);
-  }
+  const rows = parseIncomeStatementRows(sheet);
+  await amendFinancialData(rows, req, fileDate);
 }
 
-async function amendFinancialData(data, req, formattedDate, fullDate) {
+// ─── Database writers ─────────────────────────────────────────────────────────
+
+async function processFinancialData(rows, req, fileDate) {
   const userid = req.session.userid;
-  let db = await connectDb();
+  const prisma = getPrismaClient();
+
+  let dbDate;
   try {
-    const categoryMap = {
-      REVENUE: ["Gross sales"],
-      "COST OF GOODS SOLD": [
-        "Beginning inventory",
-        "Add: Purchases",
-        "Freight-in",
-        "Direct labor",
-        "Indirect expenses",
-        "Less: ending inventory",
-      ],
-      "OTHER INCOME": ["Gain on sale of assets", "Interest income"],
-      EXPENSES: [
-        "Advertising",
-        "Amortization",
-        "Bad debts",
-        "Bank charges",
-        "Charitable contributions",
-        "Commissions",
-        "Contract labor",
-        "Depreciation",
-        "Dues and subscriptions",
-        "Employee benefit programs",
-        "Insurance",
-        "Interest",
-        "Legal and professional fees",
-        "Licenses and fees",
-        "Miscellaneous",
-        "Office expenses",
-        "Payroll taxes",
-        "Postage",
-        "Rent",
-        "Repairs and maintenance",
-        "Supplies",
-        "Telephone",
-        "Travel",
-        "Utilities",
-        "Vehicle expenses",
-        "Wages",
-      ],
-      TOTAL: [
-        "Total Other Income",
-        "Total expenses",
-        "Cost of goods sold",
-        "Net income",
-        "Gross profit",
-        "Net sales",
-      ],
-    };
-
-    for (let row of data) {
-      if (!row || row.length < 2) continue;
-
-      const subcategory = row.find((cell) => typeof cell === "string")?.trim();
-      const amount = parseFloat(
-        row.find((cell) => !isNaN(cell) && cell !== null && cell !== undefined)
-      );
-
-      if (!subcategory || isNaN(amount)) continue;
-
-      let category = "";
-      for (let cat in categoryMap) {
-        if (
-          categoryMap[cat].some((subcat) =>
-            new RegExp(subcat, "i").test(subcategory)
-          )
-        ) {
-          category = cat;
-          break;
-        }
-      }
-
-      if (category) {
-        const existingQuery = {
-          text: `SELECT * FROM excel_companydata WHERE userid = $1 AND category = $2 AND subcategory = $3 AND date::TEXT LIKE $4`,
-          values: [userid, category, subcategory, `${formattedDate}%`],
-        };
-
-        const existingRecord = await db.query(existingQuery);
-
-        if (existingRecord.rows.length > 0) {
-          const updateQuery = {
-            text: `UPDATE excel_companydata 
-                              SET amount = $1, date = $5 
-                              WHERE userid = $2 AND category = $3 AND subcategory = $4 AND date::TEXT LIKE $6`,
-            values: [amount, userid, category, subcategory, fullDate, `${formattedDate}%`],
-          };
-          await db.query(updateQuery);
-        } else {
-          const insertQuery = {
-            text: `INSERT INTO excel_companydata (userid, category, subcategory, amount, date)
-                              VALUES ($1, $2, $3, $4, $5)`,
-            values: [userid, category, subcategory, amount, fullDate],
-          };
-          await db.query(insertQuery);
-        }
-      }
-    }
+    dbDate = toDbDate(fileDate);
   } catch (err) {
-    console.error("Error updating data in the database:", err.message);
-  } finally {
-    await closeDb(db);
+    throw new Error(`Cannot persist financial data: ${err.message}`);
+  }
+
+  const inserts = rows.map(({ category, subcategory, amount }) => ({
+    userid,
+    category,
+    subcategory,
+    amount,
+    date: dbDate,
+  }));
+
+  if (inserts.length === 0) return;
+
+  try {
+    await prisma.excel_companydata.createMany({ data: inserts });
+  } catch (err) {
+    console.error("Error inserting financial data:", err.message);
+    throw err;
   }
 }
+
+async function amendFinancialData(rows, req, fileDate) {
+  const userid = req.session.userid;
+  const prisma = getPrismaClient();
+
+  let dbDate, start, nextMonthStart;
+  try {
+    dbDate = toDbDate(fileDate);
+    const monthStr =
+      fileDate instanceof Date
+        ? `${fileDate.getUTCFullYear()}-${String(fileDate.getUTCMonth() + 1).padStart(2, "0")}`
+        : fileDate;
+    ({ start, nextMonthStart } = toMonthRange(monthStr));
+  } catch (err) {
+    throw new Error(`Cannot amend financial data: ${err.message}`);
+  }
+
+  // Track which subcategories are in the new Excel file
+  const subcategoriesInExcel = new Set(rows.map(r => r.subcategory));
+
+  const ops = rows.map(({ category, subcategory, amount }) =>
+    prisma.excel_companydata
+      .findFirst({
+        where: {
+          userid,
+          category,
+          subcategory,
+          date: { gte: start, lt: nextMonthStart },
+        },
+        select: { id: true },
+      })
+      .then((existing) => {
+        if (existing) {
+          return prisma.excel_companydata.update({
+            where: { id: existing.id },
+            data: { amount, date: dbDate },
+          });
+        }
+        return prisma.excel_companydata.create({
+          data: { userid, category, subcategory, amount, date: dbDate },
+        });
+      })
+  );
+
+  try {
+    await Promise.all(ops);
+
+    // Delete records that exist in DB but not in the new Excel file
+    await prisma.excel_companydata.deleteMany({
+      where: {
+        userid,
+        date: { gte: start, lt: nextMonthStart },
+        subcategory: { notIn: Array.from(subcategoriesInExcel) },
+      },
+    });
+  } catch (err) {
+    console.error("Error upserting or deleting financial data:", err.message);
+    throw err;
+  }
+}
+
+// ─── Query helpers ────────────────────────────────────────────────────────────
 
 export async function getExcelCompanyData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `
-      SELECT DATE(date) AS date,
-             SUM(CASE WHEN subcategory = 'Net sales' THEN amount ELSE 0 END) AS netsales,
-             SUM(CASE WHEN subcategory = 'Cost of goods sold' THEN amount ELSE 0 END) AS costofsales,
-             SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit
-      FROM excel_companydata 
-      WHERE category = 'TOTAL' and userid = $1
-      GROUP BY DATE(date)
-      ORDER BY DATE(date);
-    `,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({
-      financialData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+    const records = await prisma.excel_companydata.findMany({
+      where: { userid, category: 'TOTAL' },
+      select: { date: true, subcategory: true, amount: true },
     });
+
+    const groupedByDate = {};
+    records.forEach(({ date, subcategory, amount }) => {
+      const dateKey = new Date(date).toISOString().split('T')[0];
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = { date: dateKey, netsales: 'R0.00', costofsales: 'R0.00', grossprofit: 'R0.00' };
+      }
+      const formattedAmount = `R${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (subcategory === 'Net sales') groupedByDate[dateKey].netsales = formattedAmount;
+      else if (subcategory === 'Cost of goods sold') groupedByDate[dateKey].costofsales = formattedAmount;
+      else if (subcategory === 'Gross profit') groupedByDate[dateKey].grossprofit = formattedAmount;
+    });
+
+    const result = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ financialData: result, lastEntryDate: lastEntryDate?.date || null });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelProfitData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `
-      SELECT DATE(date) AS date,
-             SUM(CASE WHEN subcategory = 'Net income' THEN amount ELSE 0 END) AS netprofit,
-             SUM(CASE WHEN subcategory = 'Gross profit' THEN amount ELSE 0 END) AS grossprofit,
-             SUM(CASE WHEN subcategory = 'Total expenses' THEN amount ELSE 0 END) AS expenses,
-             SUM(CASE WHEN subcategory = 'Total other income' THEN amount ELSE 0 END) AS otherincome
-     FROM excel_companydata 
-     WHERE category = 'TOTAL' and userid = $1
-     GROUP BY DATE(date)
-     ORDER BY DATE(date);
-   `,
-      [userid]
-    );
-    res.json(result.rows);
+    const records = await prisma.excel_companydata.findMany({
+      where: { userid, category: 'TOTAL' },
+      select: { date: true, subcategory: true, amount: true },
+    });
+
+    const groupedByDate = {};
+    records.forEach(({ date, subcategory, amount }) => {
+      const dateKey = new Date(date).toISOString().split('T')[0];
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = { date: dateKey, netprofit: 'R0.00', grossprofit: 'R0.00', expenses: 'R0.00', otherincome: 'R0.00' };
+      }
+      const formattedAmount = `R${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (subcategory === 'Net income') groupedByDate[dateKey].netprofit = formattedAmount;
+      else if (subcategory === 'Gross profit') groupedByDate[dateKey].grossprofit = formattedAmount;
+      else if (subcategory === 'Total expenses') groupedByDate[dateKey].expenses = formattedAmount;
+      else if (subcategory === 'Total other income') groupedByDate[dateKey].otherincome = formattedAmount;
+    });
+
+    const result = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelExpensesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'EXPENSES' and userid = $1`,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({
-      expenseData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "EXPENSES" },
+      select: { date: true, amount: true, subcategory: true },
     });
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ expenseData: result, lastEntryDate: lastEntryDate?.date || null });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelIncomeData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'OTHER INCOME' and userid = $1`,
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM excel_companydata WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({
-      incomeData: result.rows,
-      lastEntryDate: lastEntryDate.rows[0]?.date || null,
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "OTHER INCOME" },
+      select: { date: true, amount: true, subcategory: true },
     });
+    const lastEntryDate = await prisma.excel_companydata.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ incomeData: result, lastEntryDate: lastEntryDate?.date || null });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getExcelCostOfSalesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.userid;
   try {
-    const result = await db.query(
-      `SELECT date, amount, subcategory FROM excel_companydata WHERE category = 'COST OF GOODS SOLD' and userid = $1`,
-      [userid]
-    );
-    res.json(result.rows);
+    const result = await prisma.excel_companydata.findMany({
+      where: { userid, category: "COST OF GOODS SOLD" },
+      select: { date: true, amount: true, subcategory: true },
+    });
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
