@@ -1,9 +1,12 @@
 import fetch from "node-fetch";
-import { connectDb, closeDb } from "../../config/database.js";
+import { getPrismaClient } from "../../config/prismaClient.js";
 import { hash, compare } from "bcrypt";
 import { encrypt, decrypt } from "../../utils/crypto.js";
 import jsonpath from "jsonpath";
 import { formatDate } from "../../utils/file.js";
+import logger, { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("sage");
 
 const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
 const apiKey = "{CD7C40B3-D20E-4311-BA13-EE1ED804E023}";
@@ -42,7 +45,7 @@ export async function validateSageCredentials(username, password) {
       };
     }
   } catch (error) {
-    console.error("Error validating Sage credentials:", error);
+    moduleLogger.error({ error }, "Error validating Sage credentials");
     return { isValid: false, error: error.message };
   }
 }
@@ -129,16 +132,19 @@ export async function getCompanyData(username, password) {
       companyData: selectedCompany,
     };
   } catch (error) {
-    console.error("Error in getCompanyData:", error);
+    moduleLogger.error({ error }, "Error in getCompanyData");
     return { isValid: false, error: error.message };
   }
 }
 
-export function generateMonthlyDateRanges(startYear = 2024, startMonth = 0) {
+export function generateMonthlyDateRanges(isInitialExtraction = true, startMonth = 0) {
   const dateRanges = [];
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
+  const yearsBack = isInitialExtraction ? 3 : 1;
+  const startYear = currentYear - yearsBack;
+  moduleLogger.info({ isInitialExtraction, startYear, currentYear, currentMonth: currentMonth + 1 }, "Generating date ranges");
 
   for (let year = startYear; year <= currentYear; year++) {
     const firstMonth = year === startYear ? startMonth : 0;
@@ -193,7 +199,7 @@ export async function getProfitAndLossForSpecificMonth(
       data: profitLossData,
     };
   } catch (error) {
-    console.error(`Error getting profit and loss data:`, error);
+    moduleLogger.error({ error }, "Error getting profit and loss data");
     throw error;
   }
 }
@@ -205,6 +211,7 @@ export async function processMonthlyData(
   email,
   encryptedPassword
 ) {
+  const prisma = getPrismaClient();
   try {
     extractionStatus.sage[userid] = false;
     const password = decrypt(encryptedPassword);
@@ -227,34 +234,29 @@ export async function processMonthlyData(
         await insertSageCostOfSales(profitAndLossData, userid, recordDate);
         await insertSageTotals(profitAndLossData, userid, recordDate);
       } catch (error) {
-        console.error(`Failed to process ${range.monthName}:`, error);
+        moduleLogger.error({ month: range.monthName, error }, "Failed to process month");
       }
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    const db = await connectDb();
-    try {
-      await db.query(
-        "UPDATE user_table SET first_time_insertion = true WHERE userid = $1",
-        [userid]
-      );
-    } finally {
-      await closeDb(db);
-    }
+    await prisma.user_table.update({
+      where: { userid },
+      data: { first_time_insertion: false },
+    });
 
     extractionStatus.sage[userid] = true;
     setTimeout(() => {
       delete extractionStatus.sage[userid];
     }, 60 * 60 * 1000);
   } catch (error) {
-    console.error(`Error in processMonthlyData:`, error);
+    moduleLogger.error({ error }, "Error in processMonthlyData");
     extractionStatus.sage[userid] = true;
   }
 }
 
 async function getSageRevenue(profitandlossdata, userid, customDate = null) {
-  let db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     const date = customDate || new Date();
     const revenue = jsonpath.query(
@@ -267,34 +269,38 @@ async function getSageRevenue(profitandlossdata, userid, customDate = null) {
     }));
 
     for (const revenue of salesExtracted) {
-      const existingRecord = await db.query(
-        `SELECT * FROM sage_revenue WHERE userid = $1 AND category = $2 AND date = $3`,
-        [userid, revenue.name, date]
-      );
+      const existingRecord = await prisma.sage_revenue.findFirst({
+        where: { userid, category: revenue.name, date },
+        select: { revenueid: true, revenue: true },
+      });
 
-      if (existingRecord.rows.length > 0) {
-        await db.query(
-          `UPDATE sage_revenue SET revenue = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
-          [revenue.amount, userid, revenue.name, date]
-        );
+      if (existingRecord) {
+        if (Number(existingRecord.revenue) !== Number(revenue.amount)) {
+          await prisma.sage_revenue.update({
+            where: { revenueid: existingRecord.revenueid },
+            data: { revenue: Number(revenue.amount) },
+          });
+        }
       } else {
-        await db.query(
-          `INSERT INTO sage_revenue (userid, category, revenue, date) VALUES ($1, $2, $3, $4)`,
-          [userid, revenue.name, revenue.amount, date]
-        );
+        await prisma.sage_revenue.create({
+          data: {
+            userid,
+            category: revenue.name,
+            revenue: Number(revenue.amount),
+            date,
+          },
+        });
       }
     }
     return salesExtracted;
   } catch (err) {
-    console.error(`Error in getSageRevenue:`, err);
+    moduleLogger.error({ err }, "Error in getSageRevenue");
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
 async function insertSageExpenses(profitandlossdata, userid, customDate = null) {
-  let db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
     const expenses = jsonpath.query(
@@ -307,34 +313,38 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
     }));
 
     for (const expense of expensesExtracted) {
-      const existingRecord = await db.query(
-        `SELECT * FROM sage_expenses WHERE userid = $1 AND category = $2 AND date = $3`,
-        [userid, expense.name, formattedDate]
-      );
+      const existingRecord = await prisma.sage_expenses.findFirst({
+        where: { userid, category: expense.name, date: formattedDate },
+        select: { expenseid: true, amount: true },
+      });
 
-      if (existingRecord.rows.length > 0) {
-        await db.query(
-          `UPDATE sage_expenses SET amount = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
-          [expense.amount, userid, expense.name, formattedDate]
-        );
+      if (existingRecord) {
+        if (Number(existingRecord.amount) !== Number(expense.amount)) {
+          await prisma.sage_expenses.update({
+            where: { expenseid: existingRecord.expenseid },
+            data: { amount: Number(expense.amount) },
+          });
+        }
       } else {
-        await db.query(
-          `INSERT INTO sage_expenses (userid, category, amount, date) VALUES ($1, $2, $3, $4)`,
-          [userid, expense.name, expense.amount, formattedDate]
-        );
+        await prisma.sage_expenses.create({
+          data: {
+            userid,
+            category: expense.name,
+            amount: Number(expense.amount),
+            date: formattedDate,
+          },
+        });
       }
     }
     return expensesExtracted;
   } catch (err) {
-    console.error(`Error in insertSageExpenses:`, err);
+    moduleLogger.error({ err }, "Error in insertSageExpenses");
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
 async function insertSageCostOfSales(profitandlossdata, userid, customDate = null) {
-  let db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
     const costOfSales = jsonpath.query(
@@ -347,34 +357,38 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
     }));
 
     for (const item of costOfSalesExtracted) {
-      const existingRecord = await db.query(
-        `SELECT * FROM sage_costofsales WHERE userid = $1 AND category = $2 AND date = $3`,
-        [userid, item.name, formattedDate]
-      );
+      const existingRecord = await prisma.sage_costofsales.findFirst({
+        where: { userid, category: item.name, date: formattedDate },
+        select: { costofsalesid: true, costofsales: true },
+      });
 
-      if (existingRecord.rows.length > 0) {
-        await db.query(
-          `UPDATE sage_costofsales SET amount = $1 WHERE userid = $2 AND category = $3 AND date = $4`,
-          [item.amount, userid, item.name, formattedDate]
-        );
+      if (existingRecord) {
+        if (Number(existingRecord.costofsales) !== Number(item.amount)) {
+          await prisma.sage_costofsales.update({
+            where: { costofsalesid: existingRecord.costofsalesid },
+            data: { costofsales: Number(item.amount) },
+          });
+        }
       } else {
-        await db.query(
-          `INSERT INTO sage_costofsales (userid, category, amount, date) VALUES ($1, $2, $3, $4)`,
-          [userid, item.name, item.amount, formattedDate]
-        );
+        await prisma.sage_costofsales.create({
+          data: {
+            userid,
+            category: item.name,
+            costofsales: Number(item.amount),
+            date: formattedDate,
+          },
+        });
       }
     }
     return costOfSalesExtracted;
   } catch (err) {
-    console.error(`Error in insertSageCostOfSales:`, err);
+    moduleLogger.error({ err }, "Error in insertSageCostOfSales");
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
 async function insertSageTotals(profitandlossdata, userid, customDate = null) {
-  let db = await connectDb();
+  const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
     const totals = jsonpath.query(
@@ -397,37 +411,32 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
       totals.find((item) => item.Description === "Total for Expenses")
         ?.Total?.[0] || 0;
 
-    const existingRecord = await db.query(
-      `SELECT * FROM sage_company_calcs WHERE userid = $1 AND date = $2`,
-      [userid, formattedDate]
-    );
+    const existingRecord = await prisma.sage_company_calcs.findFirst({
+      where: { userid, date: formattedDate },
+      select: { sage_calc_id: true },
+    });
 
-    if (existingRecord.rows.length > 0) {
-      await db.query(
-        `UPDATE sage_company_calcs SET grossprofit = $1, opexpenses = $2, netprofit = $3, sumofsales = $4, sumofcost = $5 WHERE userid = $6 AND date = $7`,
-        [
-          grossProfit,
-          totalExpenses,
-          netProfit,
-          totalSales,
-          totalCostOfSales,
-          userid,
-          formattedDate,
-        ]
-      );
+    const data = {
+      grossprofit: Number(grossProfit),
+      opexpenses: Number(totalExpenses),
+      netprofit: Number(netProfit),
+      sumofsales: Number(totalSales),
+      sumofcost: Number(totalCostOfSales),
+    };
+
+    if (existingRecord) {
+      await prisma.sage_company_calcs.update({
+        where: { sage_calc_id: existingRecord.sage_calc_id },
+        data,
+      });
     } else {
-      await db.query(
-        `INSERT INTO sage_company_calcs (userid, grossprofit, opexpenses, netprofit, sumofsales, sumofcost, date) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
+      await prisma.sage_company_calcs.create({
+        data: {
           userid,
-          grossProfit,
-          totalExpenses,
-          netProfit,
-          totalSales,
-          totalCostOfSales,
-          formattedDate,
-        ]
-      );
+          date: formattedDate,
+          ...data,
+        },
+      });
     }
 
     return {
@@ -439,103 +448,98 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
       date: formattedDate,
     };
   } catch (err) {
-    console.error(`Error in insertSageTotals:`, err);
+    moduleLogger.error({ err }, "Error in insertSageTotals");
     throw err;
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getSageCompanyData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.user.userid;
 
   try {
-    const result = await db.query(
-      "SELECT date, sumofsales, sumofcost, grossprofit FROM sage_company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM sage_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.sage_company_calcs.findMany({
+      where: { userid },
+      select: { date: true, sumofsales: true, sumofcost: true, grossprofit: true },
+      orderBy: { date: "asc" },
+    });
+    const lastEntryDate = await prisma.sage_company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageCompanyData");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getSageProfitData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.user.userid;
   try {
-    const result = await db.query(
-      "SELECT date, grossprofit, opexpenses, netprofit FROM sage_company_calcs WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.sage_company_calcs.findMany({
+      where: { userid },
+      select: { date: true, grossprofit: true, opexpenses: true, netprofit: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageProfitData");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getSageExpensesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.user.userid;
   try {
-    const result = await db.query(
-      "SELECT date, amount, category FROM sage_expenses WHERE userid = $1 ORDER BY category",
-      [userid]
-    );
-    const lastEntryDate = await db.query(
-      `SELECT date FROM sage_company_calcs WHERE userid = $1 GROUP BY date ORDER BY date DESC LIMIT 1`,
-      [userid]
-    );
-    res.json({ data: result.rows, lastEntryDate: lastEntryDate.rows[0].date });
+    const data = await prisma.sage_expenses.findMany({
+      where: { userid },
+      select: { date: true, amount: true, category: true },
+      orderBy: { category: "asc" },
+    });
+    const lastEntryDate = await prisma.sage_company_calcs.findFirst({
+      where: { userid },
+      select: { date: true },
+      orderBy: { date: "desc" },
+    });
+    res.json({ data, lastEntryDate: lastEntryDate?.date });
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageExpensesData");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getSageRevenueData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.user.userid;
   try {
-    const result = await db.query(
-      "SELECT date, category, revenue FROM sage_revenue WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.sage_revenue.findMany({
+      where: { userid },
+      select: { date: true, category: true, revenue: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageRevenueData");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
 
 export async function getSageCostOfSalesData(req, res) {
-  const db = await connectDb();
+  const prisma = getPrismaClient();
   const userid = req.session.user.userid;
   try {
-    const result = await db.query(
-      "SELECT date, costofsales FROM sage_costofsales WHERE userid = $1 ORDER BY date",
-      [userid]
-    );
-    res.json(result.rows);
+    const data = await prisma.sage_costofsales.findMany({
+      where: { userid },
+      select: { date: true, costofsales: true, category: true },
+      orderBy: { date: "asc" },
+    });
+    res.json(data);
   } catch (err) {
-    console.error(err);
+    moduleLogger.error({ err }, "Server Error in getSageCostOfSalesData");
     res.status(500).send("Server Error");
-  } finally {
-    await closeDb(db);
   }
 }
