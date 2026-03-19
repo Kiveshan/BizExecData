@@ -126,11 +126,23 @@ router.get(authurl, async (req, res) => {
     ) {
       req.session.userid = existingUser.userid;
       qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to loading");
-      res.redirect(`/quickbooks-loading`);
+      req.session.save((err) => {
+        if (err) {
+          qbRouteLogger.error({ err, userid: existingUser.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect(`/quickbooks-loading`);
+      });
     } else {
       req.session.userid = existingUser.userid;
       qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to company");
-      res.redirect("/company");
+      req.session.save((err) => {
+        if (err) {
+          qbRouteLogger.error({ err, userid: existingUser.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/company");
+      });
     }
   } catch (err) {
     qbRouteLogger.error({ err }, "Error during QuickBooks OAuth callback");

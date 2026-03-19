@@ -123,14 +123,40 @@ router.get("/auth/xero/callback", async (req, res) => {
     }
 
     const isInitialExtraction = user.first_time_insertion;
+    if (isInitialExtraction === true && license?.status === "Paid") {
+      req.session.userid = user.userid;
+      xeroRouteLogger.info({ userid: user.userid }, "Xero user with first_time_insertion=true redirected to profit page for data extraction");
+      req.session.save((err) => {
+        if (err) {
+          xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/profit");
+      });
+      return;
+    }
+
     if (isInitialExtraction === false && license?.status === "Paid") {
       req.session.userid = user.userid;
       xeroRouteLogger.info({ userid: user.userid }, "Xero user redirected to profit page");
-      return res.redirect("/profit");
+      req.session.save((err) => {
+        if (err) {
+          xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/profit");
+      });
+      return;
     }
 
     req.session.userid = user.userid;
-    return res.redirect("/xerocompany");
+    req.session.save((err) => {
+      if (err) {
+        xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+        return res.status(500).send("Session error");
+      }
+      res.redirect("/xerocompany");
+    });
   } catch (err) {
     xeroRouteLogger.error({ err }, "Error during Xero callback");
     res.send("Sorry, something went wrong");
