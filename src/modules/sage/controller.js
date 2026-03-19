@@ -1,10 +1,9 @@
 import fetch from "node-fetch";
 import { getPrismaClient } from "../../config/prismaClient.js";
-import { hash, compare } from "bcrypt";
-import { encrypt, decrypt } from "../../utils/crypto.js";
+import {decrypt } from "../../utils/crypto.js";
 import jsonpath from "jsonpath";
 import { formatDate } from "../../utils/file.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const moduleLogger = createModuleLogger("sage");
 
@@ -38,7 +37,7 @@ export async function validateSageCredentials(username, password) {
     try {
       await makeApiCall("Company/Get", username, password);
       return { isValid: true, data };
-    } catch (apiError) {
+    } catch {
       return {
         isValid: false,
         error: "Your Sage account doesn't have proper API access permissions.",

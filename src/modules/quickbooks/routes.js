@@ -15,7 +15,7 @@ import {
   extractionStatus,
 } from "./extractor.js";
 import { formatDate } from "../../utils/file.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
@@ -35,7 +35,6 @@ router.get("/auth", (req, res) => {
 });
 
 router.get(authurl, async (req, res) => {
-  const date = new Date();
   const prisma = getPrismaClient();
   try {
     await oauthClient.createToken(req.url).then((authResponse) => {
@@ -57,7 +56,6 @@ router.get(authurl, async (req, res) => {
     const companyInfo = authResponse.json.QueryResponse.CompanyInfo[0];
     const companyName = companyInfo.CompanyName || companyInfo.LegalName;
     const email = companyInfo.Email?.Address || "";
-    const phone = companyInfo.PrimaryPhone?.FreeFormNumber || "";
     const address = `${companyInfo.CompanyAddr?.Line1}, ${companyInfo.CompanyAddr?.City}, ${companyInfo.CompanyAddr?.CountrySubDivisionCode}, ${companyInfo.CompanyAddr?.PostalCode}`;
     const industryType =
       companyInfo.NameValue.find((nv) => nv.Name === "QBOIndustryType")?.Value ||

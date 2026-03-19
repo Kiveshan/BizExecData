@@ -10,7 +10,7 @@ import {
 } from "./controller.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const userRouteLogger = createModuleLogger("user-routes");
 

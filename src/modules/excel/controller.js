@@ -1,6 +1,6 @@
 import { getPrismaClient } from "../../config/prismaClient.js";
 import xlsx from "xlsx";
-import { formatDate, formatExcelDate } from "../../utils/file.js";
+import { formatExcelDate } from "../../utils/file.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

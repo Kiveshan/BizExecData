@@ -2,7 +2,7 @@ import { getPrismaClient } from "../../config/prismaClient.js";
 import { oauthClient } from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const moduleLogger = createModuleLogger("quickbooks");
 

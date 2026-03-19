@@ -3,7 +3,7 @@ import { findUserByEmail, findRoleIdByRoleName } from "./service.js";
 import { hash } from "bcrypt";
 import passport from "passport";
 import { validateEmail, validatePassword, sanitizeInput } from "../../utils/validation.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const authControllerLogger = createModuleLogger("auth-controller");
 
@@ -11,7 +11,7 @@ export async function login(req, res, next) {
   const prisma = getPrismaClient();
   authControllerLogger.debug({ email: req.body.email }, "Login attempt started");
 
-  passport.authenticate("local", async (err, user, info) => {
+  passport.authenticate("local", async (err, user) => {
     try {
       if (err || !user) {
         authControllerLogger.warn({ email: req.body.email }, "Login failed - user not found or error");
