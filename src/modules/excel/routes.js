@@ -14,7 +14,7 @@ import {
   getExcelIncomeData,
   getExcelCostOfSalesData,
 } from "./controller.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const excelRouteLogger = createModuleLogger("excel-routes");
 

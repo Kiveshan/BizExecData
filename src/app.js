@@ -12,7 +12,6 @@ import rateLimit from "express-rate-limit";
 import initializePassport from "./config/passport.js";
 import { createSessionMiddleware } from "./middleware/session.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import { securityConfig } from "./config/security.js";
 import logger, { createModuleLogger } from "./utils/logger.js";
 
 const appLogger = createModuleLogger("app");

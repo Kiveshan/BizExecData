@@ -1,8 +1,8 @@
 import { Router } from "express";
 import app from "../../app.js";
-import { checkAuthenticated, checkNotAuthenticated } from "../../middleware/auth.js";
+import { checkNotAuthenticated } from "../../middleware/auth.js";
 import { login, logout, register, registerSimple } from "./controller.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const authLogger = createModuleLogger("auth");
 

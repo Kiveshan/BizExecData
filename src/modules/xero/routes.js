@@ -8,7 +8,7 @@ import {
   processXeroData,
   extractionStatus,
 } from "./extractor.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const xeroRouteLogger = createModuleLogger("xero-routes");
 
