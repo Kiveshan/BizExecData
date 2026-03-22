@@ -49,10 +49,6 @@ app.get("/revenue", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "revenue.html"));
 });
 
-app.get("/incomes", (req, res) => {
-  serverLogger.debug({ path: "/incomes" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "incomes.html"));
-});
 
 app.get("/expenses", (req, res) => {
   serverLogger.debug({ path: "/expenses" }, "Serving static file");
