@@ -96,9 +96,6 @@ app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 appLogger.debug("View engine configured (ejs)");
 
-app.use(express.static("public"));
-appLogger.debug("Static file serving configured");
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(flash());
 app.use(createSessionMiddleware());

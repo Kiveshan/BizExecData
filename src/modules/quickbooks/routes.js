@@ -104,7 +104,7 @@ router.get(authurl, async (req, res) => {
       });
 
       return res.redirect(
-        `/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
+        `/?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
       );
     }
     if (
@@ -115,7 +115,7 @@ router.get(authurl, async (req, res) => {
     ) {
       qbRouteLogger.warn({ userid: existingUser.userid, status: existingUser.status }, "QuickBooks user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
+        `/?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
       );
     }
 
