@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import { xero } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
+import { checkAuthenticated } from "../../middleware/auth.js";
 import {
   processXeroData,
   extractionStatus,
@@ -257,19 +258,19 @@ router.get("/update_xerodashboard", async (req, res) => {
   res.redirect("/xero-loading");
 });
 
-router.get("/xerocompany", (req, res) => {
+router.get("/xerocompany", checkAuthenticated, (req, res) => {
   xeroRouteLogger.debug("Serving xerocompany page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xerocompany.html"));
+  res.render("xerocompany");
 });
 
-router.get("/xerorevenue", (req, res) => {
+router.get("/xerorevenue", checkAuthenticated, (req, res) => {
   xeroRouteLogger.debug("Serving xerorevenue page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xerorevenue.html"));
+  res.render("xerorevenue");
 });
 
-router.get("/xeroexpenses", (req, res) => {
+router.get("/xeroexpenses", checkAuthenticated, (req, res) => {
   xeroRouteLogger.debug("Serving xeroexpenses page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xeroexpenses.html"));
+  res.render("xeroexpenses");
 });
 
 router.get("/api/xerocompany", async (req, res) => {
