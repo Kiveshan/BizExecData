@@ -218,10 +218,14 @@ router.get("/check-xero-extraction", (req, res) => {
   xeroRouteLogger.debug({ userid, status }, "Xero extraction status checked");
 
   if (status === undefined) {
-    return res.json({ complete: true });
+    return res.json({ complete: true, progress: 100 });
   }
 
-  res.json({ complete: status });
+  if (typeof status === 'object') {
+    return res.json({ complete: status.complete, progress: status.progress, total: status.total });
+  }
+
+  res.json({ complete: status, progress: status ? 100 : 0 });
 });
 
 router.get("/profit", async (req, res) => {
