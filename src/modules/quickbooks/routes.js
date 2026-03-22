@@ -490,36 +490,6 @@ router.get("/check-quickbooks-extraction", (req, res) => {
   res.json({ complete: status, progress: status ? 100 : 0 });
 });
 
-router.get("/quickbooks", (req, res) => {
-  try {
-    if (!oauth2_token_json) {
-      qbRouteLogger.debug("No OAuth token found, redirecting to auth");
-      return res.redirect("/auth");
-    }
 
-    const token = oauth2_token_json;
-
-    if (oauthClient.isAccessTokenValid()) {
-      qbRouteLogger.debug("Access token valid, serving quickbooks page");
-      return res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
-    }
-
-    qbRouteLogger.debug("Access token expired, refreshing token");
-    oauthClient
-      .refreshUsingToken(token.refresh_token)
-      .then((authResponse) => {
-        setOAuthToken(authResponse.getJson());
-        qbRouteLogger.debug("Token refreshed successfully");
-        res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
-      })
-      .catch((err) => {
-        qbRouteLogger.error({ err }, "Error refreshing token");
-        res.redirect("/auth");
-      });
-  } catch (error) {
-    qbRouteLogger.error({ error }, "Error in quickbooks route");
-    res.status(500).send("Update failed");
-  }
-});
 
 export default router;
