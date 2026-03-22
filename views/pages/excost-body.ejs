@@ -1,0 +1,316 @@
+<%- include('../partials/ex_navbar') %>
+
+<div id="sidebar">
+  <%- include('../partials/ex_sidebar') %>
+</div>
+
+<script>
+  function attachSidebarHandlers() {
+      const buttons = document.querySelectorAll('.button');
+      buttons.forEach(button => {
+          button.addEventListener('click', function() {
+              const href = this.getAttribute('data-href');
+              if (href) {
+                  window.location.href = href;
+              }
+          });
+      });
+  }
+
+  function highlightButtons() {
+      const url = window.location.pathname.split('/').pop();
+      const buttons = document.querySelectorAll('.button');
+      buttons.forEach(button => {
+          const buttonUrl = button.getAttribute('data-href');
+          if (buttonUrl === `/${url}`) {
+              button.style.backgroundColor = 'darkgreen';
+          }
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    attachSidebarHandlers();
+    highlightButtons();
+  });
+</script>
+
+<div class="main-content">
+    <div class="chart-container">
+      <div class="chart-item">
+        <h2>Net Sales vs Cost of Sales per Month</h2>
+        <canvas id="financialChart"></canvas>
+      </div>
+      <div class="chart-item">
+        <h2>Cost of Sales Breakdown</h2>
+        <canvas id="costChart"></canvas>
+      </div>
+    </div>
+
+    <div class="filter-dropdowns">
+      <div>
+        <h3>Select Year</h3>
+        <div class="dropdown">
+          <select id="yearSelect" class="dropdown-select">
+            <option value="">Select Year</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <h3>Select Month</h3>
+        <div class="dropdown">
+          <select id="monthSelect" class="dropdown-select">
+            <option value="">Select Month</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-container">
+      <div>
+        <h3>Trends</h3>
+        <div class="slider-container">
+          <label class="switch">
+            <input type="checkbox" id="sixMonthsToggle">
+            <span class="slider">
+              <span class="slider-text">6 Months</span>
+            </span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="threeMonthsToggle">
+            <span class="slider">
+              <span class="slider-text">3 Months</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let grossData = [];
+      let costData = [];
+      let financialChart;
+      let costChart;
+
+      function formatMonthYear(dateString) {
+        const date = new Date(dateString);
+        const month = date.toLocaleString('default', { month: 'long' });
+        const year = date.getFullYear();
+        return `${month} ${year}`;
+      }
+
+      function populateYearButtons(years, year) {
+        const yearSelect = document.getElementById('yearSelect');
+        yearSelect.innerHTML = '<option value="">Select Year</option>';
+        const uniqueYears = Array.from(new Set(years));
+        uniqueYears.forEach(year => {
+          const option = document.createElement('option');
+          option.value = year;
+          option.textContent = year;
+          yearSelect.appendChild(option);
+        });
+        yearSelect.addEventListener('change', updateCharts);
+        yearSelect.value = year;
+      }
+
+      function populateMonthButtons(labels, month) {
+        const monthSelect = document.getElementById('monthSelect');
+        monthSelect.innerHTML = '<option value="">Select Month</option>';
+        const uniqueLabels = Array.from(new Set(labels));
+        uniqueLabels.forEach(label => {
+          const option = document.createElement('option');
+          option.value = label;
+          option.textContent = label;
+          monthSelect.appendChild(option);
+        });
+        monthSelect.addEventListener('change', updateCharts);
+        monthSelect.value = month;
+      }
+
+      function getSelectedMonths() {
+        const monthSelect = document.getElementById('monthSelect');
+        return monthSelect.value ? [monthSelect.value] : [];
+      }
+
+      function getSelectedYears() {
+        const yearSelect = document.getElementById('yearSelect');
+        return yearSelect.value ? [yearSelect.value] : [];
+      }
+
+      function filterData(selectedMonths, selectedYears, data) {
+        return data.filter(row => {
+          const rowMonth = formatMonthYear(row.date).split(' ')[0];
+          const rowYear = formatMonthYear(row.date).split(' ')[1];
+          if (selectedMonths.length === 0 && selectedYears.length === 0) {
+            return true;
+          }
+          if (selectedMonths.length === 0) {
+            return selectedYears.includes(rowYear);
+          }
+          if (selectedYears.length === 0) {
+            return selectedMonths.includes(rowMonth);
+          }
+          return selectedMonths.includes(rowMonth) && selectedYears.includes(rowYear);
+        });
+      }
+
+      function updateCharts() {
+        const selectedMonths = getSelectedMonths();
+        const selectedYears = getSelectedYears();
+        const filteredGrossData = filterData(selectedMonths, selectedYears, grossData);
+        const filteredCostData = filterData(selectedMonths, selectedYears, costData);
+
+        updateFinancialChart(filteredGrossData);
+        updateCostChart(filteredCostData);
+
+        if (selectedMonths.length > 0 || selectedYears.length > 0) {
+          document.getElementById('sixMonthsToggle').checked = false;
+          document.getElementById('threeMonthsToggle').checked = false;
+        }
+      }
+
+      function updateFinancialChart(filteredData) {
+        financialChart.data.labels = filteredData.map(row => formatMonthYear(row.date));
+        financialChart.data.datasets[0].data = filteredData.map(row => parseFloat(row.netsales.replace(/R|\s/g, '').replace(',', '.')));
+        financialChart.data.datasets[1].data = filteredData.map(row => parseFloat(row.costofsales.replace(/R|\s/g, '').replace(',', '.')));
+        financialChart.update();
+      }
+
+      function aggregateCostData(data) {
+        const aggregated = {};
+        data.forEach(row => {
+          const subcategory = row.subcategory;
+          const amount = parseFloat(row.amount.replace(/R|\s/g, '').replace(',', '.'));
+          if (!aggregated[subcategory]) {
+            aggregated[subcategory] = 0;
+          }
+          aggregated[subcategory] += amount;
+        });
+        return Object.keys(aggregated).map(subcategory => ({
+          subcategory,
+          amount: aggregated[subcategory]
+        }));
+      }
+
+      function updateCostChart(filteredData) {
+        const aggregatedData = aggregateCostData(filteredData);
+        costChart.data.labels = aggregatedData.map(row => row.subcategory);
+        costChart.data.datasets[0].data = aggregatedData.map(row => row.amount);
+        costChart.update();
+      }
+
+      function getLast6MonthsData(data) {
+        const currentDate = new Date();
+        const sixMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
+        return data.filter(row => new Date(row.date) >= sixMonthsAgo);
+      }
+
+      function getLast3MonthsData(data) {
+        const currentDate = new Date();
+        const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
+        return data.filter(row => new Date(row.date) >= threeMonthsAgo);
+      }
+
+      function fetchDefaultMonthYear() {
+        Promise.all([
+          fetch('/api/excompany').then(response => response.json()),
+          fetch('/api/ex_costofsales').then(response => response.json())
+        ])
+        .then(([grossDataResponse, costDataResponse]) => {
+          grossData = grossDataResponse.financialData;
+          costData = costDataResponse;
+          const lastEntryDate = grossDataResponse.lastEntryDate;
+          const month = formatMonthYear(lastEntryDate).split(' ')[0];
+          const year = formatMonthYear(lastEntryDate).split(' ')[1];
+          const labels = grossData.map(row => formatMonthYear(row.date).split(' ')[0]);
+          const years = grossData.map(row => formatMonthYear(row.date).split(' ')[1]);
+          populateMonthButtons(labels, month);
+          populateYearButtons(years, year);
+          initializeCharts();
+          updateCharts();
+        })
+        .catch(error => console.error('Error fetching data:', error));
+      }
+
+      function initializeCharts() {
+        const ctx1 = document.getElementById('financialChart').getContext('2d');
+        financialChart = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'Net Sales',
+                data: [],
+                borderColor: 'rgba(140, 7, 10, 1)',
+                backgroundColor: 'rgba(140, 7, 10, 0.8)',
+                borderWidth: 1
+              },
+              {
+                label: 'Cost of Sales',
+                data: [],
+                borderColor: 'rgba(46, 117, 105, 1)',
+                backgroundColor: 'rgba(46, 117, 105, 0.8)',
+                borderWidth: 1
+              }
+            ]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+
+        const ctx2 = document.getElementById('costChart').getContext('2d');
+        costChart = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'Cost of Sales',
+                data: [],
+                borderColor: 'rgba(225, 219, 19, 1)',
+                backgroundColor: 'rgba(225, 219, 19, 0.8)',
+                borderWidth: 1
+              }
+            ]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
+
+      document.getElementById('sixMonthsToggle').addEventListener('change', function() {
+        if (this.checked) {
+          document.getElementById('threeMonthsToggle').checked = false;
+          document.getElementById('yearSelect').value = '';
+          document.getElementById('monthSelect').value = '';
+          updateFinancialChart(getLast6MonthsData(grossData));
+          updateCostChart(getLast6MonthsData(costData));
+        }
+      });
+
+      document.getElementById('threeMonthsToggle').addEventListener('change', function() {
+        if (this.checked) {
+          document.getElementById('sixMonthsToggle').checked = false;
+          document.getElementById('yearSelect').value = '';
+          document.getElementById('monthSelect').value = '';
+          updateFinancialChart(getLast3MonthsData(grossData));
+          updateCostChart(getLast3MonthsData(costData));
+        }
+      });
+
+      fetchDefaultMonthYear();
+    });
+  </script>

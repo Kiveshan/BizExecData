@@ -90,24 +90,28 @@ app.get("/xeroexpenses.html", (req, res) => {
 // Static file serving (assets). Mounted after routes so dynamic routes take precedence.
 app.use(express.static("public"));
 
-app.get("/exexpenses.html", (req, res) => {
-  serverLogger.debug({ path: "/exexpenses.html" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "exexpenses.html"));
+app.get(["/excompany.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy excompany route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/excompany${query}`);
 });
 
-app.get("/excompany.html", (req, res) => {
-  serverLogger.debug({ path: "/excompany.html" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "excompany.html"));
+app.get(["/excost.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy excost route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/excost${query}`);
 });
 
-app.get("/excost.html", (req, res) => {
-  serverLogger.debug({ path: "/excost.html" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "excost.html"));
+app.get(["/exincome.html", "/exincomes.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy exincome route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/exincome${query}`);
 });
 
-app.get("/exincomes.html", (req, res) => {
-  serverLogger.debug({ path: "/exincomes.html" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "exincome.html"));
+app.get(["/exexpenses.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy exexpenses route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/exexpenses${query}`);
 });
 
 // Error handling middleware - must be last, after all routes
