@@ -69,6 +69,24 @@ app.get("/expenses.html", (req, res) => {
   res.redirect(301, `/expenses${query}`);
 });
 
+app.get("/xerocompany.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy xerocompany route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/xerocompany${query}`);
+});
+
+app.get("/xerorevenue.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy xerorevenue route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/xerorevenue${query}`);
+});
+
+app.get("/xeroexpenses.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy xeroexpenses route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/xeroexpenses${query}`);
+});
+
 // Static file serving (assets). Mounted after routes so dynamic routes take precedence.
 app.use(express.static("public"));
 
