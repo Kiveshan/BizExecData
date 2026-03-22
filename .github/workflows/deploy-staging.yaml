@@ -31,10 +31,6 @@ jobs:
       - name: Run tests
         run: npm test
 
-      # Optional: Uncomment the following step if your app requires a build (e.g., for React or TypeScript)
-      # - name: Build project
-      #   run: npm run build
-
       - name: Generate deployment package
         run: zip -r ${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' 'node_modules/*' 'coverage/*'
 
