@@ -1,5 +1,6 @@
 import app, { __dirname, errorHandler, notFoundHandler } from "./src/app.js";
 import { port } from "./src/config/env.js";
+import express from "express";
 import path from "path";
 import logger, { createModuleLogger } from "./src/utils/logger.js";
 
@@ -39,10 +40,19 @@ app.use("/", sageRoutes);
 
 serverLogger.info("All routes mounted successfully");
 
-app.get("/index", (req, res) => {
-  serverLogger.debug({ path: "/index" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+app.get("/", (req, res) => {
+  serverLogger.debug({ path: "/" }, "Serving home page");
+  res.render("index");
 });
+
+app.get(["/index", "/index.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy index route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/${query}`);
+});
+
+// Static file serving (assets). Mounted after routes so dynamic routes take precedence.
+app.use(express.static("public"));
 
 app.get("/revenue", (req, res) => {
   serverLogger.debug({ path: "/revenue" }, "Serving static file");
