@@ -233,8 +233,19 @@ router.get("/profit", async (req, res) => {
     xeroRouteLogger.warn("Unauthorized access to profit page");
     return res.redirect("/login");
   }
-  xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xero-loading from profit");
-  res.redirect("/xero-loading");
+  const prisma = getPrismaClient();
+  const user = await prisma.user_table.findUnique({
+    where: { userid: req.session.userid },
+    select: { first_time_insertion: true },
+  });
+  
+  if (user?.first_time_insertion === true) {
+    xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xero-loading from profit for first-time extraction");
+    return res.redirect("/xero-loading");
+  }
+  
+  xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xerocompany from profit");
+  res.redirect("/xerocompany");
 });
 
 router.get("/update_xerodashboard", async (req, res) => {
