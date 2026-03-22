@@ -251,6 +251,16 @@ router.get("/xerocompany", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xerocompany.html"));
 });
 
+router.get("/xerorevenue", (req, res) => {
+  xeroRouteLogger.debug("Serving xerorevenue page");
+  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xerorevenue.html"));
+});
+
+router.get("/xeroexpenses", (req, res) => {
+  xeroRouteLogger.debug("Serving xeroexpenses page");
+  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xeroexpenses.html"));
+});
+
 router.get("/api/xerocompany", async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;

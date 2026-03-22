@@ -272,6 +272,16 @@ router.get("/sagecompany", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "..", "..", "public", "sage_company.html"));
 });
 
+router.get("/sage_revenue", (req, res) => {
+  sageRouteLogger.debug("Serving sage_revenue page");
+  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "sage_revenue.html"));
+});
+
+router.get("/sage_expenses", (req, res) => {
+  sageRouteLogger.debug("Serving sage_expenses page");
+  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "sage_expenses.html"));
+});
+
 router.post("/check-user-exists", async (req, res) => {
   const prisma = getPrismaClient();
   try {
