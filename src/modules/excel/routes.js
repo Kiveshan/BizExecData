@@ -50,7 +50,7 @@ router.get("/exexpenses", checkAuthenticated, (req, res) => {
 
 router.get("/upload", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug({ userid: req.session?.userid }, "Serving upload page");
-  res.render("upload.ejs", { errorMessage: null });
+  res.render("upload", { errorMessage: null });
 });
 
 router.post("/upload", checkAuthenticated, async (req, res) => {
@@ -96,7 +96,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       (fileYear === currentYear && fileMonth > currentMonth)
     ) {
       excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Future date upload rejected");
-      return res.render("upload.ejs", {
+      return res.render("upload", {
         errorMessage: "Cannot upload a date from the future.",
       });
     }
@@ -104,7 +104,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
     const dateExists = await checkDateExistsInDb(formattedFileDate, req);
     if (dateExists) {
       excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Duplicate date upload rejected");
-      return res.render("upload.ejs", {
+      return res.render("upload", {
         errorMessage: `File for the date ${fileDate} has already been uploaded.`,
       });
     }
@@ -128,12 +128,12 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
   }
 });
 
-router.get("/amending", (req, res) => {
+router.get("/amending", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug("Serving amending page");
   res.render("amend", { errorMessage: null });
 });
 
-router.post("/amend", async (req, res) => {
+router.post("/amend", checkAuthenticated, async (req, res) => {
   if (!req.files || !req.files.file) {
     excelRouteLogger.warn("No file uploaded for amendment");
     return res.status(400).send("No file uploaded.");
