@@ -96,6 +96,24 @@ app.get(["/excompany.html"], (req, res) => {
   res.redirect(301, `/excompany${query}`);
 });
 
+app.get(["/sage_company.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy sage_company route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/sagecompany${query}`);
+});
+
+app.get(["/sage_revenue.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy sage_revenue route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/sage_revenue${query}`);
+});
+
+app.get(["/sage_expenses.html"], (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy sage_expenses route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/sage_expenses${query}`);
+});
+
 app.get(["/excost.html"], (req, res) => {
   serverLogger.debug({ path: req.path }, "Redirecting legacy excost route");
   const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
