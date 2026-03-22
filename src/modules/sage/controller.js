@@ -212,7 +212,8 @@ export async function processMonthlyData(
 ) {
   const prisma = getPrismaClient();
   try {
-    extractionStatus.sage[userid] = false;
+    const totalItems = dateRanges.length;
+    extractionStatus.sage[userid] = { progress: 0, complete: false, total: totalItems };
     const password = decrypt(encryptedPassword);
 
     for (let i = 0; i < dateRanges.length; i++) {
@@ -236,6 +237,9 @@ export async function processMonthlyData(
         moduleLogger.error({ month: range.monthName, error }, "Failed to process month");
       }
 
+      const progress = Math.round(((i + 1) / totalItems) * 100);
+      extractionStatus.sage[userid].progress = progress;
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
@@ -244,13 +248,13 @@ export async function processMonthlyData(
       data: { first_time_insertion: false },
     });
 
-    extractionStatus.sage[userid] = true;
+    extractionStatus.sage[userid] = { progress: 100, complete: true, total: totalItems };
     setTimeout(() => {
       delete extractionStatus.sage[userid];
     }, 60 * 60 * 1000);
   } catch (error) {
     moduleLogger.error({ error }, "Error in processMonthlyData");
-    extractionStatus.sage[userid] = true;
+    extractionStatus.sage[userid] = { progress: 0, complete: true, total: 0 };
   }
 }
 

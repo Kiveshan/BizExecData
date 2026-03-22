@@ -127,6 +127,15 @@ export async function processXeroData(userid) {
     const startYear = isInitialExtraction ? currentYear - 3 : currentYear - 1;
     moduleLogger.info({ startYear, currentYear, currentMonth }, "Date range calculated");
 
+    let totalMonths = 0;
+    for (let year = startYear; year <= currentYear; year++) {
+      const endMonth = year === currentYear ? currentMonth : 12;
+      totalMonths += endMonth;
+    }
+
+    extractionStatus.xero[userid] = { progress: 0, complete: false, total: totalMonths };
+    let processedMonths = 0;
+
     for (let year = startYear; year <= currentYear; year++) {
       const endMonth = year === currentYear ? currentMonth : 12;
       for (let month = 1; month <= endMonth; month++) {
@@ -271,6 +280,10 @@ export async function processXeroData(userid) {
             }
           }
         }
+
+        processedMonths++;
+        const progress = Math.round((processedMonths / totalMonths) * 100);
+        extractionStatus.xero[userid].progress = progress;
       }
     }
 
@@ -279,13 +292,13 @@ export async function processXeroData(userid) {
       data: { first_time_insertion: false },
     });
 
-    extractionStatus.xero[userid] = true;
+    extractionStatus.xero[userid] = { progress: 100, complete: true, total: totalMonths };
 
     setTimeout(() => {
       delete extractionStatus.xero[userid];
     }, 60 * 60 * 1000);
   } catch (err) {
     moduleLogger.error({ err }, "Error in processXeroData");
-    extractionStatus.xero[userid] = true;
+    extractionStatus.xero[userid] = { progress: 0, complete: true, total: 0 };
   }
 }
