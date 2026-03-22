@@ -51,19 +51,26 @@ app.get(["/index", "/index.html"], (req, res) => {
   res.redirect(301, `/${query}`);
 });
 
+app.get("/company.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy company route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/company${query}`);
+});
+
+app.get("/revenue.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy revenue route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/revenue${query}`);
+});
+
+app.get("/expenses.html", (req, res) => {
+  serverLogger.debug({ path: req.path }, "Redirecting legacy expenses route");
+  const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+  res.redirect(301, `/expenses${query}`);
+});
+
 // Static file serving (assets). Mounted after routes so dynamic routes take precedence.
 app.use(express.static("public"));
-
-app.get("/revenue", (req, res) => {
-  serverLogger.debug({ path: "/revenue" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "revenue.html"));
-});
-
-
-app.get("/expenses", (req, res) => {
-  serverLogger.debug({ path: "/expenses" }, "Serving static file");
-  res.sendFile(path.join(__dirname, "..", "public", "expenses.html"));
-});
 
 app.get("/exexpenses.html", (req, res) => {
   serverLogger.debug({ path: "/exexpenses.html" }, "Serving static file");
