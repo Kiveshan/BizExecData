@@ -21,11 +21,6 @@ const router = Router();
 
 router.get("/dashboard", checkAuthenticated, getDashboard);
 
-router.get("/StudentDashboard", checkAuthenticated, (req, res) => {
-  userRouteLogger.debug({ userid: req.session?.userid }, "Serving StudentDashboard");
-  res.render("newstudentdash.ejs");
-});
-
 router.get("/company", (req, res) => {
   userRouteLogger.debug("Serving company page");
   res.sendFile(path.join(__dirname, "..", "..", "..", "public", "company.html"));
