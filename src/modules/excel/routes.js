@@ -23,9 +23,29 @@ const __dirname = path.dirname(__filename);
 
 const router = Router();
 
-router.get("/excel_dashboard", (req, res) => {
+router.get("/excel_dashboard", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug("Serving excel_dashboard page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "excel_landing.html"));
+  res.render("excel_dashboard");
+});
+
+router.get("/excompany", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving excompany page");
+  res.render("excompany");
+});
+
+router.get("/excost", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving excost page");
+  res.render("excost");
+});
+
+router.get("/exincome", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving exincome page");
+  res.render("exincome");
+});
+
+router.get("/exexpenses", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving exexpenses page");
+  res.render("exexpenses");
 });
 
 router.get("/upload", checkAuthenticated, (req, res) => {
@@ -96,7 +116,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       await processExcelFile(uploadedFile.data, req);
     }
     excelRouteLogger.info({ userid: req.session?.userid, fileDate }, "File processed successfully");
-    res.redirect("/excompany.html");
+    res.redirect("/excompany");
   } catch (error) {
     excelRouteLogger.error({ 
       error: error?.message || 'Unknown error', 
