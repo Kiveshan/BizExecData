@@ -1,0 +1,351 @@
+<%- include('../partials/quickbooks_navbar') %>
+
+<div id="sidebar">
+  <%- include('../partials/sidebar') %>
+</div>
+
+<script>
+  function attachSidebarHandlers() {
+      const buttons = document.querySelectorAll('.button');
+      buttons.forEach(button => {
+          button.addEventListener('click', function() {
+              const href = this.getAttribute('data-href');
+              if (href) {
+                  window.location.href = href;
+              }
+          });
+      });
+  }
+
+  function highlightButtons() {
+      const url = window.location.pathname.split('/').pop();
+      const buttons = document.querySelectorAll('.button');
+      buttons.forEach(button => {
+          const buttonUrl = button.getAttribute('data-href');
+          if (buttonUrl === url) {
+              button.style.backgroundColor = '#4a90e2';
+          }
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    attachSidebarHandlers();
+    highlightButtons();
+  });
+</script>
+
+<div class="main-content">
+
+<div class="chart-container">
+  <div class="chart-item">
+    <h2>Chart Showing Expenses vs Gross Profit vs Net Profit per Month</h2>
+    <canvas id="ProfitChart"></canvas>
+  </div>
+  <div class="chart-item">
+    <h2>Chart Showing Expenses</h2>
+    <canvas id="expensesChart"></canvas>
+  </div>
+</div>
+
+<div class="filter-dropdowns">
+  <div>
+    <h3>Select Year</h3>
+    <div class="dropdown">
+      <select id="yearSelect" class="dropdown-select">
+        <option value="">Select Year</option>
+      </select>
+    </div>
+  </div>
+  <div>
+    <h3>Select Month</h3>
+    <div class="dropdown">
+      <select id="monthSelect" class="dropdown-select">
+        <option value="">Select Month</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="filter-container">
+  <div>
+    <h3>Trends</h3>
+    <div class="slider-container">
+      <label class="switch">
+        <input type="checkbox" id="sixMonthsToggle" checked>
+        <span class="slider">
+          <span class="slider-text">6 Months</span>
+        </span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="threeMonthsToggle">
+        <span class="slider">
+          <span class="slider-text">3 Months</span>
+        </span>
+      </label>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    let profitData = [];
+    let expensesData = [];
+    let ProfitChart;
+    let expensesChart;
+
+    function formatMonth(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('default', { month: 'long' });
+    }
+
+    function formatYear(dateString) {
+      const date = new Date(dateString);
+      return date.getFullYear().toString();
+    }
+
+    function formatMonthYear(dateString) {
+      const date = new Date(dateString);
+      const month = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      return `${month} ${year}`;
+    }
+
+    function populateYearButtons(years, lastYear) {
+      const yearSelect = document.getElementById('yearSelect');
+      yearSelect.innerHTML = '<option value="">Select Year</option>';
+      const uniqueYears = Array.from(new Set(years));
+      uniqueYears.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelect.appendChild(option);
+      });
+      yearSelect.addEventListener('change', updateCharts);
+      yearSelect.value = lastYear;
+    }
+
+    function populateMonthButtons(labels, lastMonth) {
+      const monthSelect = document.getElementById('monthSelect');
+      monthSelect.innerHTML = '<option value="">Select Month</option>';
+      const uniqueLabels = Array.from(new Set(labels));
+      uniqueLabels.forEach(label => {
+        const option = document.createElement('option');
+        option.value = label;
+        option.textContent = label;
+        monthSelect.appendChild(option);
+      });
+      monthSelect.addEventListener('change', updateCharts);
+      monthSelect.value = lastMonth;
+    }
+
+    function getSelectedMonths() {
+      const monthSelect = document.getElementById('monthSelect');
+      return monthSelect.value ? [monthSelect.value] : [];
+    }
+
+    function getSelectedYears() {
+      const yearSelect = document.getElementById('yearSelect');
+      return yearSelect.value ? [yearSelect.value] : [];
+    }
+
+    function filterData(selectedMonths, selectedYears, data) {
+      return data.filter(row => {
+        const rowMonth = formatMonth(row.date);
+        const rowYear = formatYear(row.date);
+        if (selectedMonths.length === 0 && selectedYears.length === 0) {
+          return true;
+        }
+        if (selectedMonths.length === 0) {
+          return selectedYears.includes(rowYear);
+        }
+        if (selectedYears.length === 0) {
+          return selectedMonths.includes(rowMonth);
+        }
+        return selectedMonths.includes(rowMonth) && selectedYears.includes(rowYear);
+      });
+    }
+
+    function updateCharts() {
+      const selectedMonths = getSelectedMonths();
+      const selectedYears = getSelectedYears();
+      const filteredProfitData = filterData(selectedMonths, selectedYears, profitData);
+      const filteredExpensesData = filterData(selectedMonths, selectedYears, expensesData);
+
+      updateProfitChart(filteredProfitData);
+      updateExpensesChart(filteredExpensesData);
+
+      if (selectedMonths.length > 0 || selectedYears.length > 0) {
+        document.getElementById('sixMonthsToggle').checked = false;
+        document.getElementById('threeMonthsToggle').checked = false;
+      }
+    }
+
+    function updateProfitChart(filteredData) {
+      ProfitChart.data.labels = filteredData.map(row => formatMonthYear(row.date));
+      ProfitChart.data.datasets[0].data = filteredData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g, '').replace(',', '.')));
+      ProfitChart.data.datasets[1].data = filteredData.map(row => parseFloat(row.opexpenses.replace(/R|\s/g, '').replace(',', '.')));
+      ProfitChart.data.datasets[2].data = filteredData.map(row => parseFloat(row.netprofit.replace(/R|\s/g, '').replace(',', '.')));
+      ProfitChart.update();
+    }
+
+    function updateExpensesChart(filteredData) {
+      const aggregatedData = aggregateExpensesData(filteredData);
+      expensesChart.data.labels = aggregatedData.map(row => row.category);
+      expensesChart.data.datasets[0].data = aggregatedData.map(row => row.amount);
+      expensesChart.update();
+    }
+
+    function getLast6MonthsData(data) {
+      const currentDate = new Date();
+      const sixMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
+      return data.filter(row => new Date(row.date) >= sixMonthsAgo);
+    }
+
+    function getLast3MonthsData(data) {
+      const currentDate = new Date();
+      const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
+      return data.filter(row => new Date(row.date) >= threeMonthsAgo);
+    }
+
+    function aggregateExpensesData(data) {
+      const aggregated = {};
+
+      data.forEach(row => {
+        const category = row.category;
+        const amount = parseFloat(row.expenses.replace(/R|\s/g, '').replace(',', '.'));
+
+        if (!aggregated[category]) {
+          aggregated[category] = 0;
+        }
+        aggregated[category] += amount;
+      });
+
+      return Object.keys(aggregated).map(category => ({
+        category,
+        amount: aggregated[category]
+      }));
+    }
+
+    function fetchDefaultMonthYear() {
+      Promise.all([
+        fetch('/api/profit').then(response => response.json()),
+        fetch('/api/expenses').then(response => response.json())
+      ])
+      .then(([profitDataResponse, expensesDataResponse]) => {
+        profitData = profitDataResponse;
+        expensesData = expensesDataResponse.data;
+        const lastEntryDate = expensesDataResponse.lastEntryDate;
+        const month = formatMonth(lastEntryDate);
+        const year = formatYear(lastEntryDate);
+        const labels = profitData.map(row => formatMonth(row.date));
+        const years = profitData.map(row => formatYear(row.date));
+        populateMonthButtons(labels, month);
+        populateYearButtons(years, year);
+        initializeCharts(profitData, expensesData);
+        updateCharts();
+      })
+      .catch(error => console.error('Error fetching data:', error));
+    }
+
+    function initializeCharts(profitData, expensesData) {
+      const ctx1 = document.getElementById('ProfitChart').getContext('2d');
+      ProfitChart = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: profitData.map(row => formatMonthYear(row.date)),
+          datasets: [
+            {
+              label: 'Gross Profit',
+              data: profitData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g, '').replace(',', '.'))),
+              borderColor: 'rgba(140, 7, 105, 1)',
+              backgroundColor: 'rgba(140, 7, 105, 0.8)',
+              borderWidth: 1
+            },
+            {
+              label: 'Operating Expenses',
+              data: profitData.map(row => parseFloat(row.opexpenses.replace(/R|\s/g, '').replace(',', '.'))),
+              borderColor: 'rgba(46, 7, 105, 1)',
+              backgroundColor: 'rgba(46, 7, 105, 0.8)',
+              borderWidth: 1
+            },
+            {
+              label: 'Net Profit',
+              data: profitData.map(row => parseFloat(row.netprofit.replace(/R|\s/g, '').replace(',', '.'))),
+              borderColor: 'rgba(58, 163, 187, 1)',
+              backgroundColor: 'rgba(58, 163, 187, 0.8)',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      const ctx2 = document.getElementById('expensesChart').getContext('2d');
+      expensesChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Expenses',
+              data: [],
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.8)',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      updateExpensesChart(expensesData);
+    }
+
+    function fetchLast6MonthsData() {
+      const last6MonthsProfitData = getLast6MonthsData(profitData);
+      const last6MonthsExpensesData = getLast6MonthsData(expensesData);
+      updateProfitChart(last6MonthsProfitData);
+      updateExpensesChart(last6MonthsExpensesData);
+    }
+
+    function fetchLast3MonthsData() {
+      const last3MonthsProfitData = getLast3MonthsData(profitData);
+      const last3MonthsExpensesData = getLast3MonthsData(expensesData);
+      updateProfitChart(last3MonthsProfitData);
+      updateExpensesChart(last3MonthsExpensesData);
+    }
+
+    document.getElementById('sixMonthsToggle').addEventListener('change', function() {
+      if (this.checked) {
+        document.getElementById('threeMonthsToggle').checked = false;
+        document.getElementById('yearSelect').value = '';
+        document.getElementById('monthSelect').value = '';
+        fetchLast6MonthsData();
+      }
+    });
+
+    document.getElementById('threeMonthsToggle').addEventListener('change', function() {
+      if (this.checked) {
+        document.getElementById('sixMonthsToggle').checked = false;
+        document.getElementById('yearSelect').value = '';
+        document.getElementById('monthSelect').value = '';
+        fetchLast3MonthsData();
+      }
+    });
+
+    fetchDefaultMonthYear();
+  });
+</script>
