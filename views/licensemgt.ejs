@@ -1,229 +1,264 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="./style.css">
-    <title>License Management</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>License Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #00BDD6;
-            padding: 10px 20px;
-            color: white;
-        }
+    :root {
+      --cyan:        #00BDD6;
+      --cyan-dark:   #0099B0;
+      --cyan-glow:   rgba(0,189,214,0.10);
+      --ink:         #0B1120;
+      --ink-soft:    #2E3A4A;
+      --muted:       #6B7A8D;
+      --surface:     #F2F6FA;
+      --card-bg:     #FFFFFF;
+      --border:      rgba(0,189,214,0.18);
+      --danger:      #E53935;
+      --danger-dark: #B71C1C;
+      --radius-lg:   16px;
+      --radius-md:   10px;
+      --shadow-sm:   0 2px 10px rgba(11,17,32,0.06);
+    }
 
-        /* Back button styling */
-        .back-button {
-            background-color: green;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 16px;
-        }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface);
+      color: var(--ink-soft);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-        .back-button:hover {
-            background-color: #2980b9;
-        }
+    /* ── Header ─────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      height: 64px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
 
-        /* Logout button styling */
-        .logout-button {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
+    .header-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-        .logout-button:hover {
-            background-color: #c0392b;
-        }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
 
-        /* Content */
-        .content {
-            padding: 20px;
-            background-color: #ecf0f1;
-            flex-grow: 1;
-        }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 18px;
+      border-radius: var(--radius-md);
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.18s, transform 0.12s;
+    }
 
-        /* Table Styles */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-back  { background: var(--cyan-glow); color: var(--cyan-dark); border: 1px solid var(--border); }
+    .btn-back:hover { background: rgba(0,189,214,0.20); }
+    .btn-logout { background: var(--danger); color: #fff; }
+    .btn-logout:hover { background: var(--danger-dark); }
 
-        table th, table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
+    /* ── Layout ─────────────────────────────────── */
+    .page-body {
+      flex: 1;
+      padding: 32px 36px 80px;
+      animation: fadeUp 0.45s ease both;
+    }
 
-        table th {
-            background-color: #00BDD6;
-            color: white;
-        }
+    /* ── Table Card ─────────────────────────────── */
+    .table-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(11,17,32,0.07);
+      overflow: auto;
+    }
 
-        table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
 
-        table tr:hover {
-            background-color: #f5f5f5;
-        }
+    thead tr { background: var(--cyan); }
 
-        /* Action button */
-        .action-button {
-            background-color: #00BDD6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            display: inline-block;
-        }
+    thead th {
+      padding: 13px 16px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
 
-        .action-button:hover {
-            background-color: #2980b9;
-        }
+    tbody tr {
+      border-bottom: 1px solid rgba(0,189,214,0.09);
+      transition: background 0.15s;
+    }
 
-        /* Ensure link inside button is styled */
-        .action-button a {
-            color: white;
-            text-decoration: none;
-            display: block;
-        }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: rgba(242,246,250,0.7); }
+    tbody tr:hover { background: var(--cyan-glow); }
 
-        .action-button a:hover {
-            color: white;
-        }
-    </style>
+    tbody td {
+      padding: 11px 16px;
+      font-size: 0.84rem;
+      color: var(--ink-soft);
+      vertical-align: middle;
+    }
+
+    /* ── Status Pill ────────────────────────────── */
+    .status-pill {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: capitalize;
+    }
+
+    .status-pill.active   { background: rgba(0,189,100,0.12); color: #1B5E20; }
+    .status-pill.expired  { background: rgba(229,57,53,0.12);  color: var(--danger); }
+    .status-pill.pending  { background: rgba(255,160,0,0.12);  color: #E65100; }
+    .status-pill.inactive { background: rgba(107,122,141,0.12);color: var(--muted); }
+    .status-pill.default  { background: var(--cyan-glow); color: var(--cyan-dark); }
+
+    /* ── Action Buttons (table) ─────────────────── */
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 14px;
+      border-radius: 7px;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn.renew { background: var(--cyan); color: #fff; }
+    .action-btn.renew:hover { background: var(--cyan-dark); }
+    .action-btn.deactivate { background: rgba(229,57,53,0.10); color: var(--danger); border: 1px solid rgba(229,57,53,0.22); }
+    .action-btn.deactivate:hover { background: rgba(229,57,53,0.20); }
+
+
+
+    /* ── Footer ─────────────────────────────────── */
+    .footer {
+      background: var(--cyan);
+      color: #fff;
+      text-align: center;
+      position: fixed;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
 
-    <div class="header">
-        <a href="/adminmenu" class="back-button">Back</a>
-        <h1>License Management</h1>
-        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
-            <button class="logout-button" type="submit">Logout</button>
-        </form>
+  <div class="header">
+    <a href="/adminmenu" class="btn btn-back">← Back</a>
+    <span class="header-title">License Management</span>
+    <div class="header-actions">
+      <form action="/logout?_method=DELETE" method="POST">
+        <button class="btn btn-logout" type="submit">Logout</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="page-body">
+
+    <!-- ── Main Table ── -->
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>App ID</th>
+            <th>Owner</th>
+            <th>Company</th>
+            <th>Date Submitted</th>
+            <th>Status</th>
+            <th>Valid Until</th>
+            <th colspan="2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% licenses.forEach(license => { %>
+          <tr>
+            <td><%= license.licenseid %></td>
+            <td><%= license.owner_name %></td>
+            <td><%= license.company_name %></td>
+
+            <% if (license.date_submitted) { %>
+              <td><%= new Date(license.date_submitted).toISOString().slice(0,10).replace(/-/g,'/') %></td>
+            <% } else { %><td>—</td><% } %>
+
+            <td>
+              <%
+                const s = (license.status || '').toLowerCase();
+                const cls = ['active','expired','pending','inactive'].includes(s) ? s : 'default';
+              %>
+              <span class="status-pill <%= cls %>"><%= license.status %></span>
+            </td>
+
+            <% if (license.expiration_date) { %>
+              <td><%= new Date(license.expiration_date).toISOString().slice(0,10).replace(/-/g,'/') %></td>
+            <% } else { %><td>—</td><% } %>
+
+            <td><button class="action-btn renew" onclick="window.location='/renew/<%= license.userid %>'">Renew</button></td>
+            <td><button class="action-btn deactivate" onclick="window.location='/deactivate/<%= license.userid %>'">Deactivate</button></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
     </div>
 
-    <div class="content">
-        <table>
-            <thead>
-                <tr>
-                    <th>Application ID</th>
-                    <th>Business Owner Name</th>
-                    <th>Company Name</th>
-                    <th>Date Submitted</th>
-                    <th>Status</th>
-                    <th>Valid up to</th>
-                    <th>Reminder</th>
-                    <th>Description</th>
-                    <th colspan="2">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <% licenses.forEach(license => { %>
-                    <tr>
-                        <td><%= license.licenseid %></td>
-                        <td><%= license.owner_name %></td>
-                        <td><%= license.company_name %></td>
-                    
-                        <% if (license.date_submitted) { %>
-                            <td><%= new Date(license.date_submitted).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
-                        <% } else { %>
-                            <td></td>
-                        <% } %>
-                    
-                        <td><%= license.status %></td>
-                    
-                        <% if (license.expiration_date) { %>
-                            <td><%= new Date(license.expiration_date).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
-                        <% } else { %>
-                            <td></td>
-                        <% } %>
-                        
-                        <!-- Unique ids by appending licenseid -->
-                        <td><input type="text" id="eventTitle_<%= license.licenseid %>" placeholder="Reminder"></td>
-                        <td><input type="text" id="eventDescription_<%= license.licenseid %>" placeholder="Event Description"></td>
-                        
-                        <td>
-                            <td>
-                                <button class="action-button" id="addEvent" onclick="window.location='/renew/<%= license.userid %>'">Renew</button>
-                            </td>
-                            
-                        </td>
-            
-                        <td>
-                            <button class="action-button" id="addEvent" onclick="window.location='/deactivate/<%= license.userid %>'">Deactivate</button>
-                        </td>
-                    </tr>
-                <% }); %>
-            </tbody>
-            
-        </table>
+  </div>
 
-        <div id="reminder-section">
-            <h3>Reminders</h3>
-            <ul id="reminderList">
-                <li data-event-id="1">
-                    <strong>Event Title</strong>
-                    - Event Description on Event Date
-                    <button class="delete-event" onclick="deleteEvent(1)">Delete</button>
-                </li>
-            </ul>
-        </div>
-    </div>
+  <div class="footer">© Business Executive</div>
 
-    <div id="right">
-        <h3 id="monthAndYear"></h3>
-        <div class="button-container-calendar">
-            <button id="previous" onclick="previous()">‹</button>
-            <button id="next" onclick="next()">›</button>
-        </div>
-        <table class="table-calendar" id="calendar" data-lang="en">
-            <thead id="thead-month"></thead>
-            <tbody id="calendar-body"></tbody>
-        </table>
-        <div class="footer-container-calendar">
-            <label for="month">Jump To: </label>
-            <select id="month" onchange="jump()">
-                <option value=0>Jan</option>
-                <option value=1>Feb</option>
-                <option value=2>Mar</option>
-                <option value=3>Apr</option>
-                <option value=4>May</option>
-                <option value=5>Jun</option>
-                <option value=6>Jul</option>
-                <option value=7>Aug</option>
-                <option value=8>Sep</option>
-                <option value=9>Oct</option>
-                <option value=10>Nov</option>
-                <option value=11>Dec</option>
-            </select>
-            <select id="year" onchange="jump()"></select>
-        </div>
-    </div>
-
-    
 </body>
 </html>
