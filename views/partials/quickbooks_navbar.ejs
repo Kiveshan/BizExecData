@@ -1,110 +1,127 @@
-/* Navbar styles with horizontal content */
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
 <style>
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    height: 72px;
+    background: #fff;
+    border-bottom: 1px solid rgba(0,189,214,0.18);
+    box-shadow: 0 2px 10px rgba(11,17,32,0.06);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    box-sizing: border-box;
+  }
 
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 60px; /* Adjust the height of your navbar */
-  background: #FFFFFFFF;
-  border-radius: 0px;
-  box-shadow: 0px 0px 1.5px #171a1f, 0px 0px 2px #171a1f;
-  color: white;
-  z-index: 1000;
-  display: flex;
-  justify-content: space-between; /* Spread items horizontally */
-  align-items: center;
-  padding: 0 20px;
-  box-sizing: border-box;
-}
+  /* Logo */
+  .logo-container {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+  }
 
-/* Logo */
-.logo-container {
-  height: 100%; /* Take the full height of the navbar */
-}
+  .logo {
+    height: 44px;
+    width: auto;
+  }
 
-.logo {
-  max-height: 100%; /* Ensure the logo fits within the navbar */
-  width: auto; /* Maintain aspect ratio */
-}
+  .navbar-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
 
-/* Container for the buttons */
-.nav-buttons {
-  display: flex;
-  gap: 10px; /* Add space between the buttons */
-}
+  .navbar-brand .brand-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #00BDD6;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
 
-/* Styling for the Update Dashboard button */
-.update-dashboard-button {
-  background-color: blue;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: Epilogue;
-}
+  .navbar-brand .brand-tagline {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: #6B7A8D;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
 
-.update-dashboard-button:hover {
-  background-color: #0056b3; /* Darker blue on hover */
-}
+  /* Nav buttons */
+  .nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-/* Styling for the Logout button */
-.logout-button {
-  background-color: red;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: Epilogue;
-}
+  .update-dashboard-button,
+  .logout-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 22px;
+    border-radius: 9px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s ease, transform 0.15s ease;
+    margin-top: 0;
+  }
 
-.logout-button:hover {
-  background-color: #b30000; /* Darker red on hover */
-}
+  .update-dashboard-button {
+    background-color: #00BDD6;
+    color: #fff;
+  }
 
-/* Styling for navbar links (if applicable) */
-.navbar ul {
-  list-style: none;
-  display: flex;
-  margin: 0;
-  padding: 0;
-}
+  .update-dashboard-button:hover {
+    background-color: #0099B0;
+    transform: translateY(-1px);
+  }
 
-.navbar ul li {
-  margin-right: 20px; /* Space between items */
-  font-family: Epilogue;
-}
+  .logout-button {
+    background-color: #E53935;
+    color: #fff;
+  }
 
-.navbar ul li a {
-  font-family: Epilogue;
-  font-size: 20px;
-  line-height: 22px;
-  font-weight: 700;
-  color: #00BDD6FF;
-  text-decoration: none;
-}
+  .logout-button:hover {
+    background-color: #B71C1C;
+    transform: translateY(-1px);
+  }
 
-.navbar ul li a:hover {
-  text-decoration: underline;
-}
-
+  /* Push page content below fixed navbar */
+  body {
+    padding-top: 72px;
+  }
 </style>
 
 <div class="navbar">
   <div class="logo-container">
-    <img src="logo_biz.png" alt="Logo" class="logo">
+    <img src="logo_biz.png" alt="Business Executive Logo" class="logo">
+    <div class="navbar-brand">
+      <span class="brand-name">Business Executive</span>
+      <span class="brand-tagline">Accurate Analytics &middot; Live Dashboards</span>
+    </div>
   </div>
 
   <div class="nav-buttons">
     <form action="/quickbooks-loading" method="GET" class="update-dashboard-form">
-      <button class="update-dashboard-button" type="submit" style="background-color: blue; margin-top: 20px;">Update Dashboard</button>
+      <button class="update-dashboard-button" type="submit">Update Dashboard</button>
     </form>
 
     <form action="/logout?_method=DELETE" method="POST" class="logout-form">
-      <button class="logout-button" type="submit" style="background-color: red; margin-top: 20px;">Logout</button>
+      <button class="logout-button" type="submit">Logout</button>
     </form>
   </div>
 </div>
