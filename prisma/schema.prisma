@@ -45,6 +45,7 @@ model user_table {
   xero_costofsales    xero_costofsales[]
   xero_expenses       xero_expenses[]
   xero_revenue        xero_revenue[]
+  quickbooks_oauth_token quickbooks_oauth_token?
 
   roles roles? @relation(fields: [roleid], references: [roleid])
 }
@@ -207,4 +208,17 @@ model xero_revenue {
   date      DateTime? @db.Date
 
   user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model quickbooks_oauth_token {
+  id            Int      @id @default(autoincrement())
+  userid        Int      @unique
+  realm_id      String?
+  access_token  String
+  refresh_token String
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user_table user_table @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
 }
