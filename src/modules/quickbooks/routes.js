@@ -1,7 +1,16 @@
 import { Router } from "express";
 import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
-import { oauthClient, authurl, setOAuthToken } from "./client.js";
+import crypto from "crypto";
+import {
+  oauthClient,
+  authurl,
+  setOAuthToken,
+  getQuickBooksApiBaseUrl,
+  getQuickBooksRealmId,
+  makeQuickBooksApiCall,
+  upsertQuickBooksToken,
+} from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import {
   fetchProfitAndLoss,
@@ -21,11 +30,17 @@ const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
 const router = Router();
 
+function isReconnectRequiredError(err) {
+  return err?.code === "QB_RECONNECT_REQUIRED" || String(err?.message || "") === "QB_RECONNECT_REQUIRED";
+}
+
 router.get("/auth", (req, res) => {
   qbRouteLogger.debug("Initiating QuickBooks OAuth flow");
+  const state = crypto.randomBytes(24).toString("hex");
+  req.session.qb_oauth_state = state;
   const authUri = oauthClient.authorizeUri({
     scope: [OAuthClient.scopes.Accounting],
-    state: "testState",
+    state,
   });
   qbRouteLogger.debug({ authUri }, "QuickBooks auth URI generated");
   res.redirect(authUri);
@@ -34,9 +49,16 @@ router.get("/auth", (req, res) => {
 router.get(authurl, async (req, res) => {
   const prisma = getPrismaClient();
   try {
-    await oauthClient.createToken(req.url).then((authResponse) => {
-      setOAuthToken(JSON.stringify(authResponse.json, null, 2));
-    });
+    const expectedState = req.session.qb_oauth_state;
+    const providedState = req.query?.state;
+    req.session.qb_oauth_state = null;
+    if (!expectedState || !providedState || expectedState !== providedState) {
+      qbRouteLogger.warn({ expectedStatePresent: Boolean(expectedState), providedState }, "QuickBooks OAuth state mismatch");
+      return res.status(403).send("Invalid OAuth state");
+    }
+
+    const tokenResponse = await oauthClient.createToken(req.url);
+    setOAuthToken(JSON.stringify(tokenResponse.json, null, 2));
     const companyID = oauthClient.getToken().realmId;
     const companyIdBigInt = (() => {
       try {
@@ -47,7 +69,7 @@ router.get(authurl, async (req, res) => {
     })();
 
     const authResponse = await oauthClient.makeApiCall({
-      url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=75`,
+      url: `${getQuickBooksApiBaseUrl()}/v3/company/${companyID}/query?query=select * from CompanyInfo&minorversion=75`,
     });
 
     const companyInfo = authResponse.json.QueryResponse.CompanyInfo[0];
@@ -66,7 +88,7 @@ router.get(authurl, async (req, res) => {
         })
       : null;
 
-    const exsistingLicense = await prisma.license_management.findFirst({
+    let exsistingLicense = await prisma.license_management.findFirst({
       where: {
         userid: String(companyID),
       },
@@ -76,7 +98,7 @@ router.get(authurl, async (req, res) => {
       qbRouteLogger.info({ companyID }, "New QuickBooks user registration");
       const currentDate = new Date();
 
-      await prisma.user_table.create({
+      const createdUser = await prisma.user_table.create({
         data: {
           firstname: "N/A",
           surname: "N/A",
@@ -87,15 +109,23 @@ router.get(authurl, async (req, res) => {
           company_services: industryType,
           first_time_insertion: true,
           accounting_software: "Quickbooks",
+          status: "pending",
         },
+        select: { userid: true },
       });
 
-      await prisma.license_management.create({
+      await upsertQuickBooksToken(createdUser.userid, {
+        ...tokenResponse.json,
+        realmId: companyID,
+      });
+
+      exsistingLicense = await prisma.license_management.create({
         data: {
           owner_name: "N/A",
           company_name: companyName,
           status: "Pending",
           date_submitted: currentDate,
+          expiration_date: null,
           userid: String(companyID),
         },
       });
@@ -104,6 +134,26 @@ router.get(authurl, async (req, res) => {
         `/?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
       );
     }
+
+    if (!exsistingLicense) {
+      const currentDate = new Date();
+      exsistingLicense = await prisma.license_management.create({
+        data: {
+          owner_name: "N/A",
+          company_name: companyName,
+          status: "Pending",
+          date_submitted: currentDate,
+          expiration_date: null,
+          userid: String(companyID),
+        },
+      });
+    }
+
+    await upsertQuickBooksToken(existingUser.userid, {
+      ...tokenResponse.json,
+      realmId: companyID,
+    });
+
     if (
       existingUser.status === "pending" ||
       existingUser.status === "rejected" ||
@@ -149,7 +199,7 @@ router.get(authurl, async (req, res) => {
 
 router.get("/update", async (req, res) => {
   const userid = req.session.userid;
-  const companyID = oauthClient.getToken().realmId;
+  const companyID = await getQuickBooksRealmId(userid);
   const currentDate = new Date();
   const oneYearAgo = currentDate.getFullYear() - 1;
   const startDate = `${oneYearAgo}-${currentDate.getMonth() + 1}-01`;
@@ -179,8 +229,8 @@ router.get("/update", async (req, res) => {
     }
 
     try {
-      const authResponse = await oauthClient.makeApiCall({
-        url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/reports/ProfitAndLossDetail?start_date=${startOfMonth}&end_date=${endOfMonth}`,
+      const authResponse = await makeQuickBooksApiCall(userid, {
+        url: `${getQuickBooksApiBaseUrl()}/v3/company/${companyID}/reports/ProfitAndLossDetail?start_date=${startOfMonth}&end_date=${endOfMonth}`,
       });
       const reportData = authResponse.json;
 
@@ -238,6 +288,9 @@ router.get("/update", async (req, res) => {
       }
     } catch (e) {
       qbRouteLogger.error({ error: e, startOfMonth }, "Error processing QuickBooks data for month");
+      if (isReconnectRequiredError(e)) {
+        return res.redirect("/quickbooks/auth");
+      }
     }
 
     date.setMonth(date.getMonth() + 1);
@@ -248,8 +301,8 @@ router.get("/update", async (req, res) => {
 });
 
 router.get("/fetch-income", async (req, res) => {
-  const companyID = oauthClient.getToken().realmId;
   const userid = req.session.userid;
+  const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
@@ -262,7 +315,7 @@ router.get("/fetch-income", async (req, res) => {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "Income")]'
@@ -270,6 +323,10 @@ router.get("/fetch-income", async (req, res) => {
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting income data from QuickBooks");
+      if (isReconnectRequiredError(err)) {
+        res.redirect("/quickbooks/auth");
+        return;
+      }
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -282,8 +339,8 @@ router.get("/fetch-income", async (req, res) => {
 });
 
 router.get("/fetch-cost", async (req, res) => {
-  const companyID = oauthClient.getToken().realmId;
   const userid = req.session.userid;
+  const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
@@ -296,7 +353,7 @@ router.get("/fetch-cost", async (req, res) => {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "COGS")]'
@@ -304,6 +361,10 @@ router.get("/fetch-cost", async (req, res) => {
       await findFinancialData(incomeRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting cost data from QuickBooks");
+      if (isReconnectRequiredError(err)) {
+        res.redirect("/quickbooks/auth");
+        return;
+      }
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -316,8 +377,8 @@ router.get("/fetch-cost", async (req, res) => {
 });
 
 router.get("/fetch-expenses", async (req, res) => {
-  const companyID = oauthClient.getToken().realmId;
   const userid = req.session.userid;
+  const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
@@ -330,7 +391,7 @@ router.get("/fetch-expenses", async (req, res) => {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "Expenses")]'
@@ -338,6 +399,10 @@ router.get("/fetch-expenses", async (req, res) => {
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting expenses data from QuickBooks");
+      if (isReconnectRequiredError(err)) {
+        res.redirect("/quickbooks/auth");
+        return;
+      }
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -350,8 +415,8 @@ router.get("/fetch-expenses", async (req, res) => {
 });
 
 router.get("/fetch-otherexpenses", async (req, res) => {
-  const companyID = oauthClient.getToken().realmId;
   const userid = req.session.userid;
+  const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
@@ -364,7 +429,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "OtherExpenses")]'
@@ -372,6 +437,10 @@ router.get("/fetch-otherexpenses", async (req, res) => {
       await findFinancialData(incomeRows, userid, endOfMonth, upsertExpenses);
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting other expenses data from QuickBooks");
+      if (isReconnectRequiredError(err)) {
+        res.redirect("/quickbooks/auth");
+        return;
+      }
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
@@ -384,8 +453,8 @@ router.get("/fetch-otherexpenses", async (req, res) => {
 });
 
 router.get("/fetch-otherincome", async (req, res) => {
-  const companyID = oauthClient.getToken().realmId;
   const userid = req.session.userid;
+  const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
   const currentDate = new Date();
   let date = new Date(startDate);
@@ -399,7 +468,7 @@ router.get("/fetch-otherincome", async (req, res) => {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "OtherIncome")]'
@@ -407,6 +476,10 @@ router.get("/fetch-otherincome", async (req, res) => {
       await findFinancialData(incomeRows, userid, endOfMonth, upsertRevenue);
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting other income data from QuickBooks");
+      if (isReconnectRequiredError(err)) {
+        res.redirect("/quickbooks/auth");
+        return;
+      }
       res.status(500).send("Error occurred while extracting and storing data.");
       return;
     }
