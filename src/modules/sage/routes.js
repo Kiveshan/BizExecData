@@ -1,6 +1,4 @@
 import { Router } from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import { hash, compare } from "bcrypt";
 import { encrypt } from "../../utils/crypto.js";
@@ -20,8 +18,7 @@ import  { createModuleLogger } from "../../utils/logger.js";
 
 const sageRouteLogger = createModuleLogger("sage-routes");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const router = Router();
 
