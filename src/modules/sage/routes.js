@@ -1,6 +1,4 @@
 import { Router } from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import { hash, compare } from "bcrypt";
 import { encrypt } from "../../utils/crypto.js";
