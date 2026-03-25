@@ -18,8 +18,7 @@ import { createModuleLogger } from "../../utils/logger.js";
 
 const excelRouteLogger = createModuleLogger("excel-routes");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const router = Router();
 
