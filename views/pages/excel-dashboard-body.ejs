@@ -1,0 +1,58 @@
+<header>
+    <nav class="navbar">
+        <div class="logo">
+            <img src="Excel2.jpg" alt="Logo">
+            <h3>Excel Dashboard<br></h3>
+        </div>
+        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+            <button class="logout-button" type="submit" style="background-color: red; margin-top: 0px;">Logout</button>
+        </form>
+    </nav>
+</header>
+
+<main>
+    <div class="tiles">
+        <a href="/upload" style="text-decoration: none;">
+            <div class="tile" >
+                <img src="upload.png" alt="Quickbooks Login">
+                <h2>Upload</h2>
+            </div>
+        </a>
+        <a href="/amending" style="text-decoration: none;">
+            <div class="tile">
+                <img src="amend.png" alt="Xero Login">
+                <h2>Amend Current Month</h2>
+            </div>
+        </a>
+        <a href="/excompany" style="text-decoration: none;">
+            <div class="tile">
+                <img src="bar-graph.png" alt="Excel Login">
+                <h2>Dashboard</h2>
+            </div>
+        </a>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        // Function to get query parameters
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // Check if the message parameter is in the URL
+        const message = getQueryParam('message');
+        if (message) {
+            // Show the message if it's present
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+
+            // Auto-hide the message after 3 seconds
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000); // 3 seconds
+        }
+    </script>
+</main>

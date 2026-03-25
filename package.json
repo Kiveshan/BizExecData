@@ -2,7 +2,11 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
@@ -34,5 +38,12 @@
     "uuid": "^11.1.0",
     "xero-node": "^9.3.0-alpha.4",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "eslint": "^9.22.0",
+    "globals": "^15.0.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
   }
 }

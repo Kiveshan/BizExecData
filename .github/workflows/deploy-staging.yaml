@@ -19,17 +19,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # Specify your Node.js version (e.g., 18, 20)
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # Optional: Uncomment the following step if your app requires a build (e.g., for React or TypeScript)
-      # - name: Build project
-      #   run: npm run build
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Prisma migrate deploy
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
 
       - name: Generate deployment package
-        run: zip -r ${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' 'node_modules/*'
+        run: zip -r ${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' 'node_modules/*' 'coverage/*'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1

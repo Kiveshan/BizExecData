@@ -1,10 +1,9 @@
 import fetch from "node-fetch";
 import { getPrismaClient } from "../../config/prismaClient.js";
-import { hash, compare } from "bcrypt";
-import { encrypt, decrypt } from "../../utils/crypto.js";
+import {decrypt } from "../../utils/crypto.js";
 import jsonpath from "jsonpath";
 import { formatDate } from "../../utils/file.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const moduleLogger = createModuleLogger("sage");
 
@@ -38,7 +37,7 @@ export async function validateSageCredentials(username, password) {
     try {
       await makeApiCall("Company/Get", username, password);
       return { isValid: true, data };
-    } catch (apiError) {
+    } catch {
       return {
         isValid: false,
         error: "Your Sage account doesn't have proper API access permissions.",
@@ -213,7 +212,8 @@ export async function processMonthlyData(
 ) {
   const prisma = getPrismaClient();
   try {
-    extractionStatus.sage[userid] = false;
+    const totalItems = dateRanges.length;
+    extractionStatus.sage[userid] = { progress: 0, complete: false, total: totalItems };
     const password = decrypt(encryptedPassword);
 
     for (let i = 0; i < dateRanges.length; i++) {
@@ -237,6 +237,9 @@ export async function processMonthlyData(
         moduleLogger.error({ month: range.monthName, error }, "Failed to process month");
       }
 
+      const progress = Math.round(((i + 1) / totalItems) * 100);
+      extractionStatus.sage[userid].progress = progress;
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
@@ -245,13 +248,13 @@ export async function processMonthlyData(
       data: { first_time_insertion: false },
     });
 
-    extractionStatus.sage[userid] = true;
+    extractionStatus.sage[userid] = { progress: 100, complete: true, total: totalItems };
     setTimeout(() => {
       delete extractionStatus.sage[userid];
     }, 60 * 60 * 1000);
   } catch (error) {
     moduleLogger.error({ error }, "Error in processMonthlyData");
-    extractionStatus.sage[userid] = true;
+    extractionStatus.sage[userid] = { progress: 0, complete: true, total: 0 };
   }
 }
 

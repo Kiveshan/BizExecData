@@ -13,7 +13,7 @@ export function createSessionMiddleware() {
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 24,
     },
   });

@@ -1,4 +1,7 @@
 import { getPrismaClient } from "../../config/prismaClient.js";
+import { createModuleLogger } from "../../utils/logger.js";
+
+const moduleLogger = createModuleLogger("admin-controller");
 
 export async function getAdminDashboard(req, res) {
   res.status(410).send("Admin dashboard is not available on this deployment.");
@@ -10,7 +13,6 @@ export async function previewUser(req, res) {
 
 export async function approveUser(req, res) {
   const { id } = req.params;
-  const adminid = req.user.userid;
 
   try {
     const prisma = getPrismaClient();
@@ -26,7 +28,7 @@ export async function approveUser(req, res) {
         });
       }
 
-      console.log(`User profile with ID ${id} approved and roles updated.`);
+      moduleLogger.info(`User profile with ID ${id} approved and roles updated.`);
     }
     res.redirect("/adminmenu");
   } catch (err) {

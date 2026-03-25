@@ -12,7 +12,7 @@ import {
   getCompanyRegApplications,
   getCompanyRegDetails,
 } from "./controller.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const adminRouteLogger = createModuleLogger("admin-routes");
 

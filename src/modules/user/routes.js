@@ -8,27 +8,27 @@ import {
   getCostOfSalesData,
   getExpensesData,
 } from "./controller.js";
-import path from "path";
-import { fileURLToPath } from "url";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const userRouteLogger = createModuleLogger("user-routes");
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = Router();
 
 router.get("/dashboard", checkAuthenticated, getDashboard);
 
-router.get("/StudentDashboard", checkAuthenticated, (req, res) => {
-  userRouteLogger.debug({ userid: req.session?.userid }, "Serving StudentDashboard");
-  res.render("newstudentdash.ejs");
+router.get("/company", checkAuthenticated, (req, res) => {
+  userRouteLogger.debug("Serving company page");
+  res.render("company");
 });
 
-router.get("/company", (req, res) => {
-  userRouteLogger.debug("Serving company page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "company.html"));
+router.get("/revenue", checkAuthenticated, (req, res) => {
+  userRouteLogger.debug("Serving revenue page");
+  res.render("revenue");
+});
+
+router.get("/expenses", checkAuthenticated, (req, res) => {
+  userRouteLogger.debug("Serving expenses page");
+  res.render("expenses");
 });
 
 router.get("/api/company", getCompanyData);

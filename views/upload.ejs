@@ -84,15 +84,7 @@ box-sizing: border-box;
 <body>
     <!-- Header with Simple Logout Button -->
   
-    <div id="navbar"></div>
-    <script>
-      // Load navbar.html into the div with id "navbar"
-      fetch('exnavbar.html')
-        .then(response => response.text())
-        .then(data => {
-          document.getElementById('navbar').innerHTML = data;
-        });
-    </script>
+    <%- include("partials/ex_navbar") %>
   
 
     

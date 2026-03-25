@@ -15,7 +15,7 @@ import {
   extractionStatus,
 } from "./extractor.js";
 import { formatDate } from "../../utils/file.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
@@ -35,7 +35,6 @@ router.get("/auth", (req, res) => {
 });
 
 router.get(authurl, async (req, res) => {
-  const date = new Date();
   const prisma = getPrismaClient();
   try {
     await oauthClient.createToken(req.url).then((authResponse) => {
@@ -57,7 +56,6 @@ router.get(authurl, async (req, res) => {
     const companyInfo = authResponse.json.QueryResponse.CompanyInfo[0];
     const companyName = companyInfo.CompanyName || companyInfo.LegalName;
     const email = companyInfo.Email?.Address || "";
-    const phone = companyInfo.PrimaryPhone?.FreeFormNumber || "";
     const address = `${companyInfo.CompanyAddr?.Line1}, ${companyInfo.CompanyAddr?.City}, ${companyInfo.CompanyAddr?.CountrySubDivisionCode}, ${companyInfo.CompanyAddr?.PostalCode}`;
     const industryType =
       companyInfo.NameValue.find((nv) => nv.Name === "QBOIndustryType")?.Value ||
@@ -106,7 +104,7 @@ router.get(authurl, async (req, res) => {
       });
 
       return res.redirect(
-        `/index.html?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
+        `/?message=Thank you for registering with BizTech, Please wait for our admin to approve your account`
       );
     }
     if (
@@ -117,7 +115,7 @@ router.get(authurl, async (req, res) => {
     ) {
       qbRouteLogger.warn({ userid: existingUser.userid, status: existingUser.status }, "QuickBooks user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
+        `/?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
       );
     }
 
@@ -128,11 +126,23 @@ router.get(authurl, async (req, res) => {
     ) {
       req.session.userid = existingUser.userid;
       qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to loading");
-      res.redirect(`/quickbooks-loading`);
+      req.session.save((err) => {
+        if (err) {
+          qbRouteLogger.error({ err, userid: existingUser.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect(`/quickbooks-loading`);
+      });
     } else {
       req.session.userid = existingUser.userid;
       qbRouteLogger.info({ userid: existingUser.userid }, "QuickBooks user redirected to company");
-      res.redirect("/company");
+      req.session.save((err) => {
+        if (err) {
+          qbRouteLogger.error({ err, userid: existingUser.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/company");
+      });
     }
   } catch (err) {
     qbRouteLogger.error({ err }, "Error during QuickBooks OAuth callback");
@@ -470,42 +480,16 @@ router.get("/check-quickbooks-extraction", (req, res) => {
   qbRouteLogger.debug({ userid, status }, "QuickBooks extraction status checked");
 
   if (status === undefined) {
-    return res.json({ complete: true });
+    return res.json({ complete: true, progress: 100 });
   }
 
-  res.json({ complete: status });
-});
-
-router.get("/quickbooks", (req, res) => {
-  try {
-    if (!oauth2_token_json) {
-      qbRouteLogger.debug("No OAuth token found, redirecting to auth");
-      return res.redirect("/auth");
-    }
-
-    const token = oauth2_token_json;
-
-    if (oauthClient.isAccessTokenValid()) {
-      qbRouteLogger.debug("Access token valid, serving quickbooks page");
-      return res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
-    }
-
-    qbRouteLogger.debug("Access token expired, refreshing token");
-    oauthClient
-      .refreshUsingToken(token.refresh_token)
-      .then((authResponse) => {
-        setOAuthToken(authResponse.getJson());
-        qbRouteLogger.debug("Token refreshed successfully");
-        res.sendFile(path.join(__dirname, "..", "..", "..", "public", "quickbooks.html"));
-      })
-      .catch((err) => {
-        qbRouteLogger.error({ err }, "Error refreshing token");
-        res.redirect("/auth");
-      });
-  } catch (error) {
-    qbRouteLogger.error({ error }, "Error in quickbooks route");
-    res.status(500).send("Update failed");
+  if (typeof status === 'object') {
+    return res.json({ complete: status.complete, progress: status.progress, total: status.total });
   }
+
+  res.json({ complete: status, progress: status ? 100 : 0 });
 });
+
+
 
 export default router;
