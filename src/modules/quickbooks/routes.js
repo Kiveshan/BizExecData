@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
-import { oauthClient, oauth2_token_json, authurl, setOAuthToken } from "./client.js";
+import { oauthClient, authurl, setOAuthToken } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import {
   fetchProfitAndLoss,
