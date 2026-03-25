@@ -4,11 +4,12 @@ import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import { xero } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
+import { checkAuthenticated } from "../../middleware/auth.js";
 import {
   processXeroData,
   extractionStatus,
 } from "./extractor.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const xeroRouteLogger = createModuleLogger("xero-routes");
 
@@ -102,7 +103,7 @@ router.get("/auth/xero/callback", async (req, res) => {
       });
 
       return res.redirect(
-        `/index.html?message=Thank you for registering with BizTech. Please wait for our admin to approve your account.`
+        `/?message=Thank you for registering with BizTech. Please wait for our admin to approve your account.`
       );
     }
 
@@ -118,19 +119,45 @@ router.get("/auth/xero/callback", async (req, res) => {
     ) {
       xeroRouteLogger.warn({ userid: user.userid, userStatus: user.status, licenseStatus: license?.status }, "Xero user access denied");
       return res.redirect(
-        `/index.html?message=Your account is ${user.status} and your license is ${license?.status}. Please contact our support team.`
+        `/?message=Your account is ${user.status} and your license is ${license?.status}. Please contact our support team.`
       );
     }
 
     const isInitialExtraction = user.first_time_insertion;
+    if (isInitialExtraction === true && license?.status === "Paid") {
+      req.session.userid = user.userid;
+      xeroRouteLogger.info({ userid: user.userid }, "Xero user with first_time_insertion=true redirected to profit page for data extraction");
+      req.session.save((err) => {
+        if (err) {
+          xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/profit");
+      });
+      return;
+    }
+
     if (isInitialExtraction === false && license?.status === "Paid") {
       req.session.userid = user.userid;
       xeroRouteLogger.info({ userid: user.userid }, "Xero user redirected to profit page");
-      return res.redirect("/profit");
+      req.session.save((err) => {
+        if (err) {
+          xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+          return res.status(500).send("Session error");
+        }
+        res.redirect("/profit");
+      });
+      return;
     }
 
     req.session.userid = user.userid;
-    return res.redirect("/xerocompany");
+    req.session.save((err) => {
+      if (err) {
+        xeroRouteLogger.error({ err, userid: user.userid }, "Failed to save session before redirect");
+        return res.status(500).send("Session error");
+      }
+      res.redirect("/xerocompany");
+    });
   } catch (err) {
     xeroRouteLogger.error({ err }, "Error during Xero callback");
     res.send("Sorry, something went wrong");
@@ -192,10 +219,14 @@ router.get("/check-xero-extraction", (req, res) => {
   xeroRouteLogger.debug({ userid, status }, "Xero extraction status checked");
 
   if (status === undefined) {
-    return res.json({ complete: true });
+    return res.json({ complete: true, progress: 100 });
   }
 
-  res.json({ complete: status });
+  if (typeof status === 'object') {
+    return res.json({ complete: status.complete, progress: status.progress, total: status.total });
+  }
+
+  res.json({ complete: status, progress: status ? 100 : 0 });
 });
 
 router.get("/profit", async (req, res) => {
@@ -203,8 +234,19 @@ router.get("/profit", async (req, res) => {
     xeroRouteLogger.warn("Unauthorized access to profit page");
     return res.redirect("/login");
   }
-  xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xero-loading from profit");
-  res.redirect("/xero-loading");
+  const prisma = getPrismaClient();
+  const user = await prisma.user_table.findUnique({
+    where: { userid: req.session.userid },
+    select: { first_time_insertion: true },
+  });
+  
+  if (user?.first_time_insertion === true) {
+    xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xero-loading from profit for first-time extraction");
+    return res.redirect("/xero-loading");
+  }
+  
+  xeroRouteLogger.debug({ userid: req.session.userid }, "Redirecting to xerocompany from profit");
+  res.redirect("/xerocompany");
 });
 
 router.get("/update_xerodashboard", async (req, res) => {
@@ -216,9 +258,19 @@ router.get("/update_xerodashboard", async (req, res) => {
   res.redirect("/xero-loading");
 });
 
-router.get("/xerocompany", (req, res) => {
+router.get("/xerocompany", checkAuthenticated, (req, res) => {
   xeroRouteLogger.debug("Serving xerocompany page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "xerocompany.html"));
+  res.render("xerocompany");
+});
+
+router.get("/xerorevenue", checkAuthenticated, (req, res) => {
+  xeroRouteLogger.debug("Serving xerorevenue page");
+  res.render("xerorevenue");
+});
+
+router.get("/xeroexpenses", checkAuthenticated, (req, res) => {
+  xeroRouteLogger.debug("Serving xeroexpenses page");
+  res.render("xeroexpenses");
 });
 
 router.get("/api/xerocompany", async (req, res) => {

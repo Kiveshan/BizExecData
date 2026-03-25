@@ -5,7 +5,10 @@ export async function findUserByEmail(email) {
     const prisma = getPrismaClient();
     return await prisma.user_table.findFirst({
       where: {
-        email: email?.toLowerCase(),
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
       },
     });
   } catch (error) {

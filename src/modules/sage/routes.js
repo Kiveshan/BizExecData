@@ -16,7 +16,7 @@ import {
   getSageRevenueData,
   getSageCostOfSalesData,
 } from "./controller.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import  { createModuleLogger } from "../../utils/logger.js";
 
 const sageRouteLogger = createModuleLogger("sage-routes");
 
@@ -24,6 +24,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
+
+function requireSageSession(req, res, next) {
+  if (req.session?.user?.userid) {
+    return next();
+  }
+  return res.redirect("/sagelogin");
+}
 
 router.get("/sagelogin", (req, res) => {
   sageRouteLogger.debug("Serving sagelogin page");
@@ -207,10 +214,14 @@ router.get("/check-extraction-complete", (req, res) => {
   sageRouteLogger.debug({ userid, status }, "Extraction status checked");
 
   if (status === undefined) {
-    return res.json({ complete: true });
+    return res.json({ complete: true, progress: 100 });
   }
 
-  res.json({ complete: status });
+  if (typeof status === 'object') {
+    return res.json({ complete: status.complete, progress: status.progress, total: status.total });
+  }
+
+  res.json({ complete: status, progress: status ? 100 : 0 });
 });
 
 router.post("/start-profit-loss-process", async (req, res) => {
@@ -263,9 +274,19 @@ router.get("/getProfitandLoss", async (req, res) => {
   res.redirect("/extract-profit-loss");
 });
 
-router.get("/sagecompany", (req, res) => {
+router.get("/sagecompany", requireSageSession, (req, res) => {
   sageRouteLogger.debug("Serving sagecompany page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "sage_company.html"));
+  res.render("sage_company");
+});
+
+router.get("/sage_revenue", requireSageSession, (req, res) => {
+  sageRouteLogger.debug("Serving sage_revenue page");
+  res.render("sage_revenue");
+});
+
+router.get("/sage_expenses", requireSageSession, (req, res) => {
+  sageRouteLogger.debug("Serving sage_expenses page");
+  res.render("sage_expenses");
 });
 
 router.post("/check-user-exists", async (req, res) => {
@@ -284,10 +305,10 @@ router.post("/check-user-exists", async (req, res) => {
   }
 });
 
-router.get("/api/sagecompany", getSageCompanyData);
-router.get("/api/sageprofit", getSageProfitData);
-router.get("/api/sageexpenses", getSageExpensesData);
-router.get("/api/sagerevenue", getSageRevenueData);
-router.get("/api/sagecostofsales", getSageCostOfSalesData);
+router.get("/api/sagecompany", requireSageSession, getSageCompanyData);
+router.get("/api/sageprofit", requireSageSession, getSageProfitData);
+router.get("/api/sageexpenses", requireSageSession, getSageExpensesData);
+router.get("/api/sagerevenue", requireSageSession, getSageRevenueData);
+router.get("/api/sagecostofsales", requireSageSession, getSageCostOfSalesData);
 
 export default router;

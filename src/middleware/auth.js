@@ -1,5 +1,5 @@
 export function checkAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) {
+  if (req.isAuthenticated() || req.session?.userid) {
     return next();
   }
   res.redirect("/login");
@@ -24,7 +24,7 @@ export function checkAdmin(req, res, next) {
 
 export function checkRole(allowedRoles) {
   return (req, res, next) => {
-    if (!req.isAuthenticated() || !req.user) {
+    if (!(req.isAuthenticated() || req.session?.userid) || !req.user) {
       return res.redirect("/login");
     }
     if (allowedRoles.includes(req.user.roleid)) {

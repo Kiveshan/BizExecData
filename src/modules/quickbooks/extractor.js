@@ -2,7 +2,7 @@ import { getPrismaClient } from "../../config/prismaClient.js";
 import { oauthClient } from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const moduleLogger = createModuleLogger("quickbooks");
 
@@ -183,6 +183,16 @@ export async function processQuickBooksData(userid) {
     const companyID = oauthClient.getToken().realmId;
     moduleLogger.info({ startDate, endDate: currentDate.toISOString().split('T')[0] }, "QuickBooks date range");
 
+    let totalMonths = 0;
+    const tempDate = new Date(startDate);
+    while (tempDate <= currentDate) {
+      totalMonths++;
+      tempDate.setMonth(tempDate.getMonth() + 1);
+    }
+
+    extractionStatus.quickbooks[userid] = { progress: 0, complete: false, total: totalMonths };
+    let processedMonths = 0;
+
     try {
       while (date <= currentDate) {
         const startOfMonth = formatDate(date);
@@ -261,6 +271,10 @@ export async function processQuickBooksData(userid) {
           moduleLogger.error({ startOfMonth, error: e }, "Error processing data for month");
         }
 
+        processedMonths++;
+        const progress = Math.round((processedMonths / totalMonths) * 100);
+        extractionStatus.quickbooks[userid].progress = progress;
+
         date.setMonth(date.getMonth() + 1);
       }
 
@@ -271,18 +285,18 @@ export async function processQuickBooksData(userid) {
         data: { first_time_insertion: false },
       });
 
-      extractionStatus.quickbooks[userid] = true;
+      extractionStatus.quickbooks[userid] = { progress: 100, complete: true, total: totalMonths };
 
       setTimeout(() => {
         delete extractionStatus.quickbooks[userid];
       }, 60 * 60 * 1000);
     } catch (error) {
       moduleLogger.error({ error }, "Error in QuickBooks data processing");
-      extractionStatus.quickbooks[userid] = true;
+      extractionStatus.quickbooks[userid] = { progress: 0, complete: true, total: 0 };
     }
   } catch (error) {
     moduleLogger.error({ error }, "Error in processQuickBooksData");
-    extractionStatus.quickbooks[userid] = true;
+    extractionStatus.quickbooks[userid] = { progress: 0, complete: true, total: 0 };
   }
 }
 

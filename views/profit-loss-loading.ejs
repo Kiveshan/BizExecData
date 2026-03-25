@@ -40,6 +40,31 @@
            max-width: 150px;
            margin-bottom: 20px;
        }
+       .progress-container {
+           margin: 30px 0;
+       }
+       .progress {
+           height: 25px;
+           background-color: #e9ecef;
+           border-radius: 5px;
+           overflow: hidden;
+       }
+       .progress-bar {
+           height: 100%;
+           background: linear-gradient(90deg, #0d6efd 0%, #0dcaf0 100%);
+           transition: width 0.3s ease;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           color: white;
+           font-weight: bold;
+           font-size: 14px;
+       }
+       .progress-text {
+           margin-top: 10px;
+           font-size: 14px;
+           color: #6c757d;
+       }
    </style>
 </head>
 <body>
@@ -57,6 +82,15 @@
            <div class="status-message">
                <p><%= description || "We're extracting your profit and loss data." %></p>
                <p>This may take a few minutes. Please don't close this window.</p>
+           </div>
+           
+           <div class="progress-container">
+               <div class="progress">
+                   <div id="progress-bar" class="progress-bar" style="width: 0%">0%</div>
+               </div>
+               <div class="progress-text">
+                   <span id="progress-percentage">0%</span> complete
+               </div>
            </div>
            
            <div id="progress-info" class="alert alert-info" role="alert">
@@ -130,9 +164,15 @@
                        return;
                    }
                    
+                   // Update progress bar if progress data is available
+                   if (data.progress !== undefined) {
+                       updateProgressBar(data.progress);
+                   }
+                   
                    if (data.complete) {
                        // Extraction is complete, redirect to dashboard
                        clearInterval(checkInterval);
+                       updateProgressBar(100);
                        updateProgressInfo('Data extraction complete! Redirecting to dashboard...', 'success');
                        
                        // Wait 2 seconds before redirecting for user to see the success message
@@ -147,6 +187,15 @@
                    console.error('Error checking extraction status:', error);
                    updateProgressInfo('Error connecting to server. Still trying...', 'warning');
                }
+           }
+           
+           // Function to update the progress bar
+           function updateProgressBar(progress) {
+               const progressBar = document.getElementById('progress-bar');
+               const progressPercentage = document.getElementById('progress-percentage');
+               progressBar.style.width = progress + '%';
+               progressBar.textContent = progress + '%';
+               progressPercentage.textContent = progress + '%';
            }
            
            // Function to update the progress info message

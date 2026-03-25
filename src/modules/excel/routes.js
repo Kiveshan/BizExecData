@@ -14,7 +14,7 @@ import {
   getExcelIncomeData,
   getExcelCostOfSalesData,
 } from "./controller.js";
-import logger, { createModuleLogger } from "../../utils/logger.js";
+import { createModuleLogger } from "../../utils/logger.js";
 
 const excelRouteLogger = createModuleLogger("excel-routes");
 
@@ -23,14 +23,34 @@ const __dirname = path.dirname(__filename);
 
 const router = Router();
 
-router.get("/excel_dashboard", (req, res) => {
+router.get("/excel_dashboard", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug("Serving excel_dashboard page");
-  res.sendFile(path.join(__dirname, "..", "..", "..", "public", "excel_landing.html"));
+  res.render("excel_dashboard");
+});
+
+router.get("/excompany", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving excompany page");
+  res.render("excompany");
+});
+
+router.get("/excost", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving excost page");
+  res.render("excost");
+});
+
+router.get("/exincome", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving exincome page");
+  res.render("exincome");
+});
+
+router.get("/exexpenses", checkAuthenticated, (req, res) => {
+  excelRouteLogger.debug("Serving exexpenses page");
+  res.render("exexpenses");
 });
 
 router.get("/upload", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug({ userid: req.session?.userid }, "Serving upload page");
-  res.render("upload.ejs", { errorMessage: null });
+  res.render("upload", { errorMessage: null });
 });
 
 router.post("/upload", checkAuthenticated, async (req, res) => {
@@ -76,7 +96,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       (fileYear === currentYear && fileMonth > currentMonth)
     ) {
       excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Future date upload rejected");
-      return res.render("upload.ejs", {
+      return res.render("upload", {
         errorMessage: "Cannot upload a date from the future.",
       });
     }
@@ -84,7 +104,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
     const dateExists = await checkDateExistsInDb(formattedFileDate, req);
     if (dateExists) {
       excelRouteLogger.warn({ userid: req.session?.userid, fileDate }, "Duplicate date upload rejected");
-      return res.render("upload.ejs", {
+      return res.render("upload", {
         errorMessage: `File for the date ${fileDate} has already been uploaded.`,
       });
     }
@@ -96,7 +116,7 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
       await processExcelFile(uploadedFile.data, req);
     }
     excelRouteLogger.info({ userid: req.session?.userid, fileDate }, "File processed successfully");
-    res.redirect("/excompany.html");
+    res.redirect("/excompany");
   } catch (error) {
     excelRouteLogger.error({ 
       error: error?.message || 'Unknown error', 
@@ -108,12 +128,12 @@ router.post("/upload", checkAuthenticated, async (req, res) => {
   }
 });
 
-router.get("/amending", (req, res) => {
+router.get("/amending", checkAuthenticated, (req, res) => {
   excelRouteLogger.debug("Serving amending page");
   res.render("amend", { errorMessage: null });
 });
 
-router.post("/amend", async (req, res) => {
+router.post("/amend", checkAuthenticated, async (req, res) => {
   if (!req.files || !req.files.file) {
     excelRouteLogger.warn("No file uploaded for amendment");
     return res.status(400).send("No file uploaded.");

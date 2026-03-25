@@ -12,7 +12,6 @@ import rateLimit from "express-rate-limit";
 import initializePassport from "./config/passport.js";
 import { createSessionMiddleware } from "./middleware/session.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import { securityConfig } from "./config/security.js";
 import logger, { createModuleLogger } from "./utils/logger.js";
 
 const appLogger = createModuleLogger("app");
@@ -70,6 +69,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      scriptSrcAttr: ["'unsafe-hashes'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
@@ -95,9 +95,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 appLogger.debug("View engine configured (ejs)");
-
-app.use(express.static("public"));
-appLogger.debug("Static file serving configured");
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(flash());

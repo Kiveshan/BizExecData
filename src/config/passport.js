@@ -1,4 +1,3 @@
-import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { findUserByEmail, findUserById } from "../modules/auth/service.js";
 
