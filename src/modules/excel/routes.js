@@ -1,6 +1,5 @@
 import { Router } from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import { checkAuthenticated } from "../../middleware/auth.js";
 import {
   checkDateExistsInDb,

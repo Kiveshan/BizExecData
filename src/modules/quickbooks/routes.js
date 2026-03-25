@@ -1,6 +1,4 @@
 import { Router } from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
 import { oauthClient, authurl, setOAuthToken } from "./client.js";
@@ -19,8 +17,7 @@ import { createModuleLogger } from "../../utils/logger.js";
 
 const qbRouteLogger = createModuleLogger("quickbooks-routes");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const router = Router();
 

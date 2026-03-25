@@ -1,6 +1,4 @@
 import { Router } from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import jsonpath from "jsonpath";
 import { xero } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
@@ -13,8 +11,7 @@ import { createModuleLogger } from "../../utils/logger.js";
 
 const xeroRouteLogger = createModuleLogger("xero-routes");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const router = Router();
 
