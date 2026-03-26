@@ -1,223 +1,194 @@
 <link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
-/* General styling */
-body {
-    margin: 0;
-    padding: 0;
-    background-color: white;
-    font-family: Arial, sans-serif;
-    overflow-x: hidden;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Navbar styling */
-.navbar {
-    display: flex;
- /* Center logo and text */
-    align-items: center;
-    padding: 10px 20px;
-    background-color: white;
-    border-bottom: 1px solid #ccc;
-}
+  :root {
+    --cyan:        #00BDD6;
+    --cyan-dark:   #0099B0;
+    --cyan-glow:   rgba(0,189,214,0.12);
+    --ink:         #0B1120;
+    --ink-soft:    #2E3A4A;
+    --muted:       #6B7A8D;
+    --surface:     #F2F6FA;
+    --card-bg:     #FFFFFF;
+    --border:      rgba(0,189,214,0.18);
+    --danger:      #E53935;
+    --radius-lg:   18px;
+    --radius-md:   10px;
+    --shadow-sm:   0 2px 10px rgba(11,17,32,0.06);
+    --shadow-card: 0 4px 24px rgba(11,17,32,0.08);
+  }
 
-.navbar .logo {
-    display: flex;
-    align-items: center;
-    margin: 0 auto;
-    margin-right: 0;
-}
-
-.navbar .logo img {
-    height: 80px; /* Increase logo size */
-    margin-right: 15px;
-}
-
-.navbar .logo h3 {
-    font-size: 30px; /* Increase font size */
-    font-weight: bold;
-    color: #06833a;
-    margin: 0;
-    text-align: center;
-}
-
-/* Navigation links styling */
-.navbar .nav-links {
-    list-style: none;
-    display: flex;
-    margin: 0;
-    padding: 0;
-}
-
-.navbar .nav-links li {
-    margin-left: 20px;
-}
-
-/* Style for the logout form, pushing it to the right */
-.logout-form {
-    margin-left: auto; /* Pushes logout button to the far right */
-}
-
-.logout-button {
-    background-color: red;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    cursor: pointer;
-    border-radius: 5px;
-    margin-bottom: 0px;
-    
-    transition: background-color 0.3s ease;
-}
-
-.logout-button:hover {
-    background-color: darkred;
-}
-.navbar .nav-links li a {
-    text-decoration: none;
-    color: white;
-    font-weight: bold;
-    font-size: 16px;
-    padding: 10px 20px;
-    background-color: #00BDD6;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-}
-
-.navbar .nav-links li a:hover {
-    background-color: #009bb0;
-}
-
-/* Tiles */
-.tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
-    gap: 60px;
-    padding: 20px;
-}
-
-.tile {
-    background-color: white;
-    padding: 20px;
-    text-decoration: none;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-    text-align: center;
-    height: 210px;   /* Fixed height */
-    width: 80%;     /* Width auto-adjusts */
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--surface);
+    color: var(--ink-soft);
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ── Navbar ──────────────────────────────────── */
+  .navbar {
+    display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 120px;
-}
+    padding: 0 40px;
+    height: 72px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0; z-index: 100;
+  }
 
-.tile img {
-    max-width: 100%;
-    max-height: 70%;
-    object-fit: contain;  /* Ensures the image scales without being cut */
-    margin: auto;         /* Center the image */
-    flex-grow: 1;         /* Allows the image to grow to take available space */
-}
+  .navbar .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
 
-.tile h2 {
-    margin-top: 10px;
-    font-size: 2rem;
+  .navbar .logo img { height: 44px; width: auto; }
 
-    color: #34495e;
-    flex-shrink: 0;  /* Prevent the h2 from shrinking */
-}
+  .navbar .logo h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--cyan);
+    letter-spacing: -0.02em;
+  }
 
-.tile:hover {
-    transform: translateY(-10px);
-}
+  .logout-form { margin-left: auto; }
 
-.tile p {
-    color: #7f8c8d;
-}
+  .logout-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 22px;
+    border-radius: var(--radius-md);
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--danger);
+    color: #fff;
+    transition: background 0.2s, transform 0.15s;
+  }
 
-/* Notification badge */
-.notification-badge {
-    background-color: red;
-    color: white;
-    border-radius: 50%;
-    padding: 5px 10px;
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 12px;
-}
+  .logout-button:hover { background: #B71C1C; transform: translateY(-1px); }
 
-/* Footer */
-.footer {
-  background-color: #00BDD6;
-  color: white;
-  text-align: center;
-  padding: 0; /* Remove padding to minimize height */
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  transition: left 0.3s, width 0.3s;
-  height: 25px; /* Reduce height */
-  display: flex;
-  align-items: center; /* Vertically center text */
-  justify-content: center; /* Horizontally center text */
-}
-
-.footer.shifted {
-  left: 250px;
-  width: calc(100% - 250px);
-}
-
-.alert {
-    padding: 15px;
-    margin: 20px 0;
-    background-color: #f44336;
-    color: white;
-    display: none;
-}
-
-/* Welcome h2 */
-h2 {
-    font-size: 1rem;
-    color: rgb(24, 2, 80);
-    line-height: 1.6;
-    margin: 0px;
-    padding: 0 20px;
-    width: 100%; /* Make it span the full width */
-}
-
-/* Styling for the Dashboard/Analytics image */
-/* Styling for the Dashboard/Analytics image */
-.dashboard-image {
-    width: 100vw; /* Full width of the viewport */
-    height: 225px; /* Fixed height */
-    margin: 0px; /* Optional margin */
-    overflow: hidden; /* Ensures no overflow */
-}
-
-.dashboard-image img {
+  /* ── Tiles ───────────────────────────────────── */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 22px;
+    padding: 52px 40px 80px;
+    max-width: 900px;
+    margin: 0 auto;
     width: 100%;
-    height: 100%;
-    object-fit: cover; /* Ensures the whole image fits without being cut */
-    background-color: #f0f0f0; /* Optional: Adds a background color for empty spaces */
-}
+    animation: fadeUp 0.5s ease both;
+  }
 
-h2>span{
-    font-size: 3rem;
-}
+  .tile {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    padding: 34px 26px 26px;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  }
 
-.tagline {
-    font-size: 0.9rem; /* Smaller font size than h3 */
-    color: #34495e; /* Color of your choice */
-    margin: 0; /* Remove default margins */
-    padding-top: 5px; /* Optional: Add some space above the tagline */
-    text-align: center; /* Center align the slogan for a neat look */
-}
+  .tile::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(140deg, var(--cyan-glow) 0%, transparent 55%);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
 
-h3>span{
-    font-size: 10px;
+  .tile:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 40px rgba(0,189,214,0.15);
+    border-color: rgba(0,189,214,0.4);
+  }
+
+  .tile:hover::after { opacity: 1; }
+
+  .tile-img-wrap {
+    width: 100%;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .tile-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+  .tile h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    position: relative;
+    z-index: 1;
     text-align: center;
-    color: rgb(24, 2, 80);
-}
+  }
+
+  .tile-cta {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--cyan);
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s, transform 0.18s;
+  }
+
+  .tile:hover .tile-cta { opacity: 1; transform: translateY(0); }
+
+  /* ── Footer ──────────────────────────────────── */
+  .footer {
+    background: var(--cyan);
+    color: #fff;
+    text-align: center;
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%; height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+
+  .alert {
+    padding: 13px 24px;
+    margin: 0 40px 16px;
+    background: #f44336;
+    color: #fff;
+    border-radius: var(--radius-md);
+    display: none;
+    font-size: 0.88rem;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 </style>
