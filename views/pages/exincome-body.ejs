@@ -4,88 +4,47 @@
   <%- include('../partials/ex_sidebar') %>
 </div>
 
-<script>
-  function attachSidebarHandlers() {
-    const buttons = document.querySelectorAll('.button');
-    buttons.forEach(button => {
-      button.addEventListener('click', function() {
-        const href = this.getAttribute('data-href');
-        if (href) {
-          window.location.href = href;
-        }
-      });
-    });
-  }
-
-  function highlightButtons() {
-    const url = window.location.pathname.split('/').pop();
-    const buttons = document.querySelectorAll('.button');
-    buttons.forEach(button => {
-      const buttonUrl = button.getAttribute('data-href');
-      if (buttonUrl === `/${url}`) {
-        button.style.backgroundColor = 'darkgreen';
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    attachSidebarHandlers();
-    highlightButtons();
-  });
-</script>
-
 <div class="main-content">
-    <div class="chart-container">
-        <div class="chart-item">
-            <h2>Chart Showing All Business Income vs Net Profit per Month</h2>
-            <canvas id="ProfitChart"></canvas>
-        </div>
-        <div class="chart-item">
-            <h2>Chart Showing Additional Income</h2>
-            <canvas id="incomeChart"></canvas>
-        </div>
-    </div>
+  <h1>Income Avenues</h1>
 
+  <!-- Filters -->
+  <div class="filters-bar">
     <div class="filter-dropdowns">
       <div>
-          <h3>Select Year</h3>
-          <div class="dropdown">
-              <select id="yearSelect" class="dropdown-select">
-                  <option value="">Select Year</option>
-              </select>
-          </div>
-      </div>
-
-      <div>
-          <h3>Select Month</h3>
-          <div class="dropdown">
-              <select id="monthSelect" class="dropdown-select">
-                  <option value="">Select Month</option>
-              </select>
-          </div>
-      </div>
-    </div>
-
-    <div class="filter-container">
-        <div>
-            <h3>Trends</h3>
-            <div class="slider-container">
-                <label class="switch">
-                    <input type="checkbox" id="sixMonthsToggle">
-                    <span class="slider">
-                        <span class="slider-text">6 Months</span>
-                    </span>
-                </label>
-                <label class="switch">
-                    <input type="checkbox" id="threeMonthsToggle">
-                    <span class="slider">
-                        <span class="slider-text">3 Months</span>
-                    </span>
-                </label>
-            </div>
+        <h3>Year</h3>
+        <div class="dropdown">
+          <select id="yearSelect" class="dropdown-select"><option value="">All years</option></select>
         </div>
-
+      </div>
+      <div>
+        <h3>Month</h3>
+        <div class="dropdown">
+          <select id="monthSelect" class="dropdown-select"><option value="">All months</option></select>
+        </div>
+      </div>
     </div>
+    <div class="filter-container">
+      <div>
+        <h3>Trends</h3>
+        <div class="slider-container">
+          <label class="switch"><input type="checkbox" id="sixMonthsToggle"><span class="slider">6 Months</span></label>
+          <label class="switch"><input type="checkbox" id="threeMonthsToggle"><span class="slider">3 Months</span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts stacked -->
+  <div class="chart-container">
+    <div class="chart-item">
+      <h2>All Business Income vs Net Profit per Month</h2>
+      <canvas id="ProfitChart"></canvas>
+    </div>
+    <div class="chart-item">
+      <h2>Additional Income by Category</h2>
+      <canvas id="incomeChart"></canvas>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -102,24 +61,15 @@
       return `${month} ${year}`;
     }
 
-    function formatMonth(dateString) {
-      const date = new Date(dateString);
-      return date.toLocaleString('default', { month: 'long' });
-    }
-
-    function formatYear(dateString) {
-      const date = new Date(dateString);
-      return date.getFullYear().toString();
-    }
+    function formatMonth(dateString) { return new Date(dateString).toLocaleString('default', { month: 'long' }); }
+    function formatYear(dateString)  { return new Date(dateString).getFullYear().toString(); }
 
     function populateYearButtons(years, lastYear) {
       const yearSelect = document.getElementById('yearSelect');
-      yearSelect.innerHTML = '<option value="">Select Year</option>';
-      const uniqueYears = Array.from(new Set(years));
-      uniqueYears.forEach(year => {
+      yearSelect.innerHTML = '<option value="">All years</option>';
+      Array.from(new Set(years)).forEach(y => {
         const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year;
+        option.value = y; option.textContent = y;
         yearSelect.appendChild(option);
       });
       yearSelect.addEventListener('change', updateCharts);
@@ -128,53 +78,35 @@
 
     function populateMonthButtons(labels, lastMonth) {
       const monthSelect = document.getElementById('monthSelect');
-      monthSelect.innerHTML = '<option value="">Select Month</option>';
-      const uniqueLabels = Array.from(new Set(labels));
-      uniqueLabels.forEach(label => {
+      monthSelect.innerHTML = '<option value="">All months</option>';
+      Array.from(new Set(labels)).forEach(l => {
         const option = document.createElement('option');
-        option.value = label;
-        option.textContent = label;
+        option.value = l; option.textContent = l;
         monthSelect.appendChild(option);
       });
       monthSelect.addEventListener('change', updateCharts);
       monthSelect.value = lastMonth;
     }
 
-    function getSelectedMonths() {
-      const monthSelect = document.getElementById('monthSelect');
-      return monthSelect.value ? [monthSelect.value] : [];
-    }
-
-    function getSelectedYears() {
-      const yearSelect = document.getElementById('yearSelect');
-      return yearSelect.value ? [yearSelect.value] : [];
-    }
+    function getSelectedMonths() { const monthSelect = document.getElementById('monthSelect'); return monthSelect.value ? [monthSelect.value] : []; }
+    function getSelectedYears()  { const yearSelect  = document.getElementById('yearSelect');  return yearSelect.value  ? [yearSelect.value]  : []; }
 
     function filterData(selectedMonths, selectedYears, data) {
       return data.filter(row => {
         const rowMonth = formatMonthYear(row.date).split(' ')[0];
-        const rowYear = formatMonthYear(row.date).split(' ')[1];
-        if (selectedMonths.length === 0 && selectedYears.length === 0) {
-          return true;
-        }
-        if (selectedMonths.length === 0) {
-          return selectedYears.includes(rowYear);
-        }
-        if (selectedYears.length === 0) {
-          return selectedMonths.includes(rowMonth);
-        }
+        const rowYear  = formatMonthYear(row.date).split(' ')[1];
+        if (selectedMonths.length === 0 && selectedYears.length === 0) return true;
+        if (selectedMonths.length === 0) return selectedYears.includes(rowYear);
+        if (selectedYears.length === 0)  return selectedMonths.includes(rowMonth);
         return selectedMonths.includes(rowMonth) && selectedYears.includes(rowYear);
       });
     }
 
     function updateCharts() {
       const selectedMonths = getSelectedMonths();
-      const selectedYears = getSelectedYears();
-      const filteredProfitData = filterData(selectedMonths, selectedYears, profitData);
-      const filteredIncomeData = filterData(selectedMonths, selectedYears, incomeData);
-      updateProfitChart(filteredProfitData);
-      updateIncomeChart(filteredIncomeData);
-
+      const selectedYears  = getSelectedYears();
+      updateProfitChart(filterData(selectedMonths, selectedYears, profitData));
+      updateIncomeChart(filterData(selectedMonths, selectedYears, incomeData));
       if (selectedMonths.length > 0 || selectedYears.length > 0) {
         document.getElementById('sixMonthsToggle').checked = false;
         document.getElementById('threeMonthsToggle').checked = false;
@@ -194,15 +126,10 @@
       data.forEach(row => {
         const subcategory = row.subcategory;
         const amount = parseFloat(row.amount.replace(/R|\s/g, '').replace(',', '.'));
-        if (!aggregated[subcategory]) {
-          aggregated[subcategory] = 0;
-        }
+        if (!aggregated[subcategory]) aggregated[subcategory] = 0;
         aggregated[subcategory] += amount;
       });
-      return Object.keys(aggregated).map(subcategory => ({
-        subcategory,
-        amount: aggregated[subcategory]
-      }));
+      return Object.keys(aggregated).map(subcategory => ({ subcategory, amount: aggregated[subcategory] }));
     }
 
     function updateIncomeChart(filteredData) {
@@ -212,17 +139,17 @@
       incomeChart.update();
     }
 
-    function getLast6MonthsData(data) {
-      const currentDate = new Date();
-      const sixMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
-      return data.filter(row => new Date(row.date) >= sixMonthsAgo);
-    }
+    function getLast6MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-6); return data.filter(row => new Date(row.date) >= ago); }
+    function getLast3MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-3); return data.filter(row => new Date(row.date) >= ago); }
 
-    function getLast3MonthsData(data) {
-      const currentDate = new Date();
-      const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
-      return data.filter(row => new Date(row.date) >= threeMonthsAgo);
-    }
+    const chartDefaults = {
+      responsive: true,
+      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 }, color: '#2E3A4A' } } },
+      scales: {
+        x: { grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } }
+      }
+    };
 
     function fetchDefaultMonthYear() {
       Promise.all([
@@ -233,103 +160,39 @@
         profitData = profitDataResponse;
         incomeData = incomeDataResponse.incomeData;
         const lastEntryDate = incomeDataResponse.lastEntryDate;
-        const month = formatMonth(lastEntryDate);
-        const year = formatYear(lastEntryDate);
-        const labels = profitData.map(row => formatMonth(row.date));
-        const years = profitData.map(row => formatYear(row.date));
-        populateMonthButtons(labels, month);
-        populateYearButtons(years, year);
-        initializeCharts(profitData, incomeData);
+        populateMonthButtons(profitData.map(row => formatMonth(row.date)), formatMonth(lastEntryDate));
+        populateYearButtons(profitData.map(row => formatYear(row.date)),   formatYear(lastEntryDate));
+
+        ProfitChart = new Chart(document.getElementById('ProfitChart').getContext('2d'), {
+          type: 'bar',
+          data: { labels: [], datasets: [
+            { label: 'Gross Profit',     data: [], borderColor: '#00BDD6', backgroundColor: 'rgba(0,189,214,0.75)',   borderWidth: 1 },
+            { label: 'Operating Income', data: [], borderColor: '#A78BFA', backgroundColor: 'rgba(167,139,250,0.75)', borderWidth: 1 },
+            { label: 'Net Profit',       data: [], borderColor: '#34D399', backgroundColor: 'rgba(52,211,153,0.75)',  borderWidth: 1 }
+          ]},
+          options: chartDefaults
+        });
+
+        incomeChart = new Chart(document.getElementById('incomeChart').getContext('2d'), {
+          type: 'bar',
+          data: { labels: [], datasets: [
+            { label: 'Additional Income', data: [], borderColor: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.75)', borderWidth: 1 }
+          ]},
+          options: chartDefaults
+        });
+
+        updateProfitChart(profitData);
+        updateIncomeChart(incomeData);
         updateCharts();
       })
       .catch(error => console.error('Error fetching data:', error));
     }
 
-    function initializeCharts(profitData, incomeData) {
-      const ctx1 = document.getElementById('ProfitChart').getContext('2d');
-      ProfitChart = new Chart(ctx1, {
-        type: 'bar',
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: 'Gross Profit',
-              data: [],
-              borderColor: 'rgba(140, 7, 105, 1)',
-              backgroundColor: 'rgba(140, 7, 105, 0.8)',
-              borderWidth: 1
-            },
-            {
-              label: 'Operating Income',
-              data: [],
-              borderColor: 'rgba(46, 7, 105, 1)',
-              backgroundColor: 'rgba(46, 7, 105, 0.8)',
-              borderWidth: 1
-            },
-            {
-              label: 'Net Profit',
-              data: [],
-              borderColor: 'rgba(58, 163, 187, 1)',
-              backgroundColor: 'rgba(58, 163, 187, 0.8)',
-              borderWidth: 1
-            }
-          ]
-        },
-        options: {
-          scales: {
-            y: {
-              beginAtZero: true
-            }
-          }
-        }
-      });
-
-      const ctx2 = document.getElementById('incomeChart').getContext('2d');
-      incomeChart = new Chart(ctx2, {
-        type: 'bar',
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: 'Additional Income',
-              data: [],
-              borderColor: 'rgba(52, 219, 192, 1)',
-              backgroundColor: 'rgba(52, 219, 192, 0.8)',
-              borderWidth: 1
-            }
-          ]
-        },
-        options: {
-          scales: {
-            y: {
-              beginAtZero: true
-            }
-          }
-        }
-      });
-
-      updateProfitChart(profitData);
-      updateIncomeChart(incomeData);
-    }
-
     document.getElementById('sixMonthsToggle').addEventListener('change', function() {
-      if (this.checked) {
-        document.getElementById('threeMonthsToggle').checked = false;
-        document.getElementById('yearSelect').value = '';
-        document.getElementById('monthSelect').value = '';
-        updateProfitChart(getLast6MonthsData(profitData));
-        updateIncomeChart(getLast6MonthsData(incomeData));
-      }
+      if (this.checked) { document.getElementById('threeMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; updateProfitChart(getLast6MonthsData(profitData)); updateIncomeChart(getLast6MonthsData(incomeData)); }
     });
-
     document.getElementById('threeMonthsToggle').addEventListener('change', function() {
-      if (this.checked) {
-        document.getElementById('sixMonthsToggle').checked = false;
-        document.getElementById('yearSelect').value = '';
-        document.getElementById('monthSelect').value = '';
-        updateProfitChart(getLast3MonthsData(profitData));
-        updateIncomeChart(getLast3MonthsData(incomeData));
-      }
+      if (this.checked) { document.getElementById('sixMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; updateProfitChart(getLast3MonthsData(profitData)); updateIncomeChart(getLast3MonthsData(incomeData)); }
     });
 
     fetchDefaultMonthYear();

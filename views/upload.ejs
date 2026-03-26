@@ -1,107 +1,72 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Upload Profit and Loss Excel File</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Profit and Loss — Business Executive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cyan: #00BDD6; --cyan-dark: #0099B0; --cyan-glow: rgba(0,189,214,0.10);
+      --ink: #0B1120; --ink-soft: #2E3A4A; --muted: #6B7A8D;
+      --surface: #F2F6FA; --card-bg: #FFFFFF; --border: rgba(0,189,214,0.18);
+      --danger: #E53935; --radius-lg: 16px; --radius-md: 10px;
+      --shadow-sm: 0 2px 10px rgba(11,17,32,0.06); --shadow-card: 0 8px 32px rgba(11,17,32,0.10);
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--ink-soft); min-height: 100vh; display: flex; flex-direction: column; }
 
-        /* Header */
-        .header {
-            width: 100%;
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            background-color: #00BDD6;
-            padding: 5px 10px;
-            color: white;
-            box-sizing: border-box;
-        }
+    /* Navbar */
+    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 0 40px; height: 72px; background: #fff; border-bottom: 1px solid var(--border); box-shadow: var(--shadow-sm); position: sticky; top: 0; z-index: 100; }
+    .navbar .logo { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+    .navbar .logo img { height: 44px; width: auto; }
+    .navbar .logo-text .brand { display: block; font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; color: var(--cyan); letter-spacing: -0.02em; line-height: 1; }
+    .navbar .logo-text .tagline { display: block; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
 
-        h1 {
-            color: #00BDD6;
-            margin-bottom: 20px;
-        }
+    /* Page */
+    .page-center { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; animation: fadeUp 0.45s ease both; }
 
-        /* Simple Logout button *
+    /* Card */
+    .upload-card { background: var(--card-bg); border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 40px 40px 36px; width: 100%; max-width: 460px; }
+    .upload-card h1 { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin-bottom: 6px; }
+    .upload-card p { font-size: 0.88rem; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
 
-        /* Form */
-        .excel-upload {
-            background-color: #ecf0f1;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-            margin-top: 40px;
-        }
+    /* Error */
+    .error-msg { background: rgba(229,57,53,0.08); border: 1px solid rgba(229,57,53,0.22); color: var(--danger); border-radius: var(--radius-md); padding: 10px 14px; font-size: 0.84rem; font-weight: 500; margin-bottom: 18px; }
 
-        input[type="file"] {
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: white;
-            width: 100%;
-        }
+    /* File input */
+    .file-input-wrap { position: relative; margin-bottom: 20px; }
+    input[type="file"] { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; color: var(--ink-soft); background: var(--surface); cursor: pointer; transition: border-color 0.18s; }
+    input[type="file"]:hover, input[type="file"]:focus { outline: none; border-color: var(--cyan); }
 
-        .upload {
-            background-color: #00BDD6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-        }
+    /* Submit */
+    .btn-upload { width: 100%; padding: 12px; background: var(--cyan); border: none; border-radius: var(--radius-md); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.15s; }
+    .btn-upload:hover { background: var(--cyan-dark); transform: translateY(-1px); }
 
-       .upload:hover {
-            background-color: #2980b9;
-        }
-
-        .main-content {
-        margin-top: 200px; /* Push content below the navbar */
-        margin-left: 0px; /* Adjust based on sidebar width */
-        padding: 20px;
-box-sizing: border-box;
-}
-
-    </style>
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
 </head>
 <body>
-    <!-- Header with Simple Logout Button -->
-  
-    <%- include("partials/ex_navbar") %>
-  
+  <%- include("partials/ex_navbar") %>
 
-    
-    <div class="main-content">
-        <h1>Upload Profit and Loss Excel File</h1>
+  <div class="page-center">
+    <div class="upload-card">
+      <h1>Upload Excel File</h1>
+      <p>Upload your Profit &amp; Loss Excel file to update your dashboard data.</p>
 
+      <% if (errorMessage) { %>
+        <div class="error-msg"><%= errorMessage %></div>
+      <% } %>
 
-        <% if (errorMessage) { %>
-            <div style="color: red; margin-bottom: 20px;">
-                <%= errorMessage %>
-            </div>
-        <% } %>
-        <form class="excel-form" action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".xlsx, .xls, .xltx, .txt" required />
-            <button class="upload" type="submit">Upload File</button>
-        </form>
+      <form class="excel-form" action="/upload" method="POST" enctype="multipart/form-data">
+        <div class="file-input-wrap">
+          <input type="file" name="file" accept=".xlsx, .xls, .xltx, .txt" required />
+        </div>
+        <button class="btn-upload" type="submit">Upload File</button>
+      </form>
     </div>
-
+  </div>
 </body>
 </html>
