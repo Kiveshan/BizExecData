@@ -1,5 +1,9 @@
 import { getPrismaClient } from "../../config/prismaClient.js";
-import { oauthClient } from "./client.js";
+import {
+  getQuickBooksApiBaseUrl,
+  getQuickBooksRealmId,
+  makeQuickBooksApiCall,
+} from "./client.js";
 import { formatDate } from "../../utils/file.js";
 import jsonpath from "jsonpath";
 import { createModuleLogger } from "../../utils/logger.js";
@@ -10,9 +14,9 @@ export const extractionStatus = {
   quickbooks: {},
 };
 
-export async function fetchProfitAndLoss(companyID, startOfMonth, endOfMonth) {
-  const authResponse = await oauthClient.makeApiCall({
-    url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/reports/ProfitAndLoss?start_date=${startOfMonth}&end_date=${endOfMonth}`,
+export async function fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth) {
+  const authResponse = await makeQuickBooksApiCall(userid, {
+    url: `${getQuickBooksApiBaseUrl()}/v3/company/${companyID}/reports/ProfitAndLoss?start_date=${startOfMonth}&end_date=${endOfMonth}`,
   });
   return authResponse.json;
 }
@@ -180,7 +184,7 @@ export async function processQuickBooksData(userid) {
     const startYear = currentDate.getFullYear() - yearsBack;
     const startDate = `${startYear}-${currentDate.getMonth() + 1}-01`;
     const date = new Date(startDate);
-    const companyID = oauthClient.getToken().realmId;
+    const companyID = await getQuickBooksRealmId(userid);
     moduleLogger.info({ startDate, endDate: currentDate.toISOString().split('T')[0] }, "QuickBooks date range");
 
     let totalMonths = 0;
@@ -219,8 +223,8 @@ export async function processQuickBooksData(userid) {
         }
 
         try {
-          const authResponse = await oauthClient.makeApiCall({
-            url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${companyID}/reports/ProfitAndLossDetail?start_date=${startOfMonth}&end_date=${endOfMonth}`,
+          const authResponse = await makeQuickBooksApiCall(userid, {
+            url: `${getQuickBooksApiBaseUrl()}/v3/company/${companyID}/reports/ProfitAndLossDetail?start_date=${startOfMonth}&end_date=${endOfMonth}`,
           });
           const reportData = authResponse.json;
 
@@ -326,7 +330,7 @@ async function processIncomeData(userid, companyID, isInitialExtraction = true) 
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const incomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "Income")]'
@@ -354,7 +358,7 @@ async function processCostData(userid, companyID, isInitialExtraction = true) {
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const costRows = jsonpath.query(data, '$.Rows.Row[?(@.group == "COGS")]');
       await findFinancialData(costRows, userid, endOfMonth, upsertCOGS);
     } catch (err) {
@@ -379,7 +383,7 @@ async function processExpensesData(userid, companyID, isInitialExtraction = true
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const expenseRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "Expenses")]'
@@ -407,7 +411,7 @@ async function processOtherIncomeData(userid, companyID, isInitialExtraction = t
     const endOfMonth = formatDate(endOfMonthDate);
 
     try {
-      const data = await fetchProfitAndLoss(companyID, startOfMonth, endOfMonth);
+      const data = await fetchProfitAndLoss(userid, companyID, startOfMonth, endOfMonth);
       const otherIncomeRows = jsonpath.query(
         data,
         '$.Rows.Row[?(@.group == "OtherIncome")]'
