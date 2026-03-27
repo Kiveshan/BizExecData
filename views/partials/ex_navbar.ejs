@@ -54,6 +54,11 @@
     gap: 10px;
   }
 
+  .nav-buttons form {
+    display: flex;
+    margin: 0;
+  }
+
   .home-button,
   .logout-button {
     display: inline-flex;
@@ -66,6 +71,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.15s ease;
+    margin-top: 0;
   }
 
   .home-button { background-color: #00BDD6; color: #fff; }
@@ -73,6 +79,9 @@
 
   .logout-button { background-color: #E53935; color: #fff; }
   .logout-button:hover { background-color: #B71C1C; transform: translateY(-1px); }
+  .logout-button {
+    margin: auto 0;
+  }
 
   body { padding-top: 72px; }
 </style>
