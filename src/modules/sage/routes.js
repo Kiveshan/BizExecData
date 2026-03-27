@@ -38,14 +38,41 @@ router.post("/sagelogin", async (req, res) => {
   const prisma = getPrismaClient();
   try {
     const { email, password, confirmed } = req.body;
-    sageRouteLogger.debug({ email }, "Sage login attempt");
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : email;
+    sageRouteLogger.debug({ email: normalizedEmail }, "Sage login attempt");
+
+    if (!normalizedEmail || !password) {
+      sageRouteLogger.warn(
+        { email: normalizedEmail, hasPassword: Boolean(password) },
+        "Login/registration failed - missing email or password"
+      );
+      return res.render("sagelogin", {
+        error: "Email and password are required",
+        email: normalizedEmail,
+      });
+    }
 
     const user = await prisma.user_table.findFirst({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (user) {
-      sageRouteLogger.debug({ email, userid: user.userid }, "Existing user found");
+      sageRouteLogger.debug(
+        { email: normalizedEmail, userid: user.userid, hasPasswordHash: Boolean(user.password) },
+        "Existing user found"
+      );
+
+      if (!user.password) {
+        sageRouteLogger.error(
+          { email: normalizedEmail, userid: user.userid },
+          "User record missing password hash"
+        );
+        return res.render("sagelogin", {
+          error: "Account is misconfigured. Please contact support.",
+          email: normalizedEmail,
+        });
+      }
+
       const passwordMatch = await compare(password, user.password);
 
       if (passwordMatch) {
@@ -84,46 +111,55 @@ router.post("/sagelogin", async (req, res) => {
 
         return res.redirect("/sagecompany");
       } else {
-        sageRouteLogger.warn({ email }, "Login failed - invalid password");
+        sageRouteLogger.warn({ email: normalizedEmail }, "Login failed - invalid password");
         return res.render("sagelogin", {
           error: "Invalid password for existing account",
-          email: email,
+          email: normalizedEmail,
         });
       }
     }
 
     if (confirmed !== "true") {
-      sageRouteLogger.debug({ email }, "Registration confirmation required");
+      sageRouteLogger.debug({ email: normalizedEmail }, "Registration confirmation required");
       return res.render("sagelogin", {
         error: "Please confirm registration to continue",
-        email: email,
+        email: normalizedEmail,
       });
     }
 
-    sageRouteLogger.info({ email }, "Validating Sage credentials for new user");
-    const validationResult = await validateSageCredentials(email, password);
+    sageRouteLogger.info({ email: normalizedEmail }, "Validating Sage credentials for new user");
+    const validationResult = await validateSageCredentials(normalizedEmail, password);
 
     if (!validationResult.isValid) {
-      sageRouteLogger.warn({ email, error: validationResult.error }, "Sage credentials validation failed");
+      sageRouteLogger.warn(
+        { email: normalizedEmail, error: validationResult.error },
+        "Sage credentials validation failed"
+      );
       return res.render("sagelogin", {
         error: validationResult.error || "Invalid Sage credentials.",
-        email: email,
+        email: normalizedEmail,
       });
     }
 
-    const companyData = await getCompanyData(email, password);
+    const companyData = await getCompanyData(normalizedEmail, password);
 
     if (!companyData.isValid || companyData.noCompanies) {
-      sageRouteLogger.warn({ email, noCompanies: companyData.noCompanies }, "Company data retrieval failed");
+      sageRouteLogger.warn(
+        { email: normalizedEmail, noCompanies: companyData.noCompanies },
+        "Company data retrieval failed"
+      );
       return res.render("sagelogin", {
         error: companyData.noCompanies
           ? "No companies found for your Sage account."
           : "Could not retrieve company data from Sage.",
-        email: email,
+        email: normalizedEmail,
       });
     }
 
-    sageRouteLogger.info({ email, companyId: companyData.companyId }, "Creating new Sage user");
+    sageRouteLogger.info(
+      { email: normalizedEmail, companyId: companyData.companyId },
+      "Creating new Sage user"
+    );
     const saltRounds = 10;
     const hashedPassword = await hash(password, saltRounds);
 
@@ -149,7 +185,7 @@ router.post("/sagelogin", async (req, res) => {
         company_services: "N/A",
         first_time_insertion: true,
         accounting_software: "Sage",
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
       },
       select: {
@@ -169,14 +205,20 @@ router.post("/sagelogin", async (req, res) => {
         userid: String(newUserId),
       },
     });
-    sageRouteLogger.info({ newUserId, email }, "New Sage user registered successfully");
+    sageRouteLogger.info(
+      { newUserId, email: normalizedEmail },
+      "New Sage user registered successfully"
+    );
 
     return res.render("sagelogin", {
       error:
         "Thank you for registering with BizExecData. Please wait for our admin to approve you",
     });
   } catch (err) {
-    sageRouteLogger.error({ err, email: req.body.email }, "Error during login/registration");
+    sageRouteLogger.error(
+      { err, email: req.body?.email },
+      "Error during login/registration"
+    );
     res.render("sagelogin", {
       error: "An error occurred during login/registration. Please try again.",
       email: req.body.email,
