@@ -2,7 +2,7 @@ name: Deploy to Elastic Beanstalk Staging
 on:
   push:
     branches:
-      - staging
+      - main
 env:
   AWS_REGION: af-south-1 # Replace with your AWS region
   EB_APPLICATION_NAME: BizExec # Replace with your Elastic Beanstalk application name
