@@ -132,9 +132,31 @@ export async function makeQuickBooksApiCall(userid, options) {
   setOauthClientTokenFromRow(currentRow);
 
   try {
-    return await oauthClient.makeApiCall(options);
+    const response = await oauthClient.makeApiCall(options);
+    
+    // Capture intuit_tid for troubleshooting (non-invasive)
+    const intuitTid = response.headers?.get('intuit_tid') || 
+                     response.response?.headers?.get('intuit_tid') ||
+                     response.intuit_tid;
+    
+    if (intuitTid) {
+      qbClientLogger.info({ userid, intuitTid, endpoint: options.url }, 
+        "QuickBooks API call completed with TID");
+    }
+    
+    return response;
   } catch (err) {
     qbClientLogger.warn({ userid, err }, "QuickBooks API call failed - attempting refresh+retry");
+
+    // Capture intuit_tid from error responses (non-invasive)
+    const intuitTid = err?.authResponse?.headers?.get('intuit_tid') ||
+                     err?.response?.headers?.get('intuit_tid') ||
+                     err?.intuit_tid;
+
+    if (intuitTid) {
+      qbClientLogger.error({ userid, intuitTid, err, endpoint: options.url }, 
+        "QuickBooks API call failed with TID");
+    }
 
     if (isInvalidGrantError(err)) {
       await clearQuickBooksToken(userid);
