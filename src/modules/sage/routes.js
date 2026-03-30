@@ -68,7 +68,7 @@ router.post("/sagelogin", async (req, res) => {
           "User record missing password hash"
         );
         return res.render("sagelogin", {
-          error: "Account is misconfigured. Please contact support.",
+          error: "Account is misconfigured. Please contact support for assistance.",
           email: normalizedEmail,
         });
       }
@@ -92,7 +92,7 @@ router.post("/sagelogin", async (req, res) => {
           sageRouteLogger.warn({ userid: user.userid }, "User login failed - license pending");
           return res.render("sagelogin", {
             error:
-              "Your license has not been renewed, Please contact our support team",
+              "Your license has not been renewed, Please contact support for assistance.",
           });
         }
 
