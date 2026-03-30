@@ -344,6 +344,27 @@ router.post("/check-user-exists", async (req, res) => {
   }
 });
 
+router.post("/validate-sage-credentials", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : email;
+
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ isValid: false, error: "Email and password are required" });
+    }
+
+    const result = await validateSageCredentials(normalizedEmail, password);
+    if (!result?.isValid) {
+      return res.status(401).json({ isValid: false, error: result?.error || "Invalid Sage credentials" });
+    }
+
+    res.json({ isValid: true });
+  } catch (error) {
+    sageRouteLogger.error({ error }, "Error validating Sage credentials");
+    res.status(500).json({ isValid: false, error: "Could not validate Sage credentials" });
+  }
+});
+
 router.get("/api/sagecompany", requireSageSession, getSageCompanyData);
 router.get("/api/sageprofit", requireSageSession, getSageProfitData);
 router.get("/api/sageexpenses", requireSageSession, getSageExpensesData);

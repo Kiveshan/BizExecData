@@ -29,15 +29,44 @@ export async function validateSageCredentials(username, password) {
       }),
     });
 
+    const contentType = response.headers.get("content-type") || "";
+    const hasJson = contentType.includes("application/json") || contentType.includes("text/json");
+
     if (!response.ok) {
+      let errorDetail;
+      if (hasJson) {
+        try {
+          errorDetail = await response.json();
+        } catch {
+          errorDetail = undefined;
+        }
+      } else {
+        try {
+          errorDetail = await response.text();
+        } catch {
+          errorDetail = undefined;
+        }
+      }
+
+      moduleLogger.warn(
+        { status: response.status, username, errorDetail },
+        "Sage Login/Validate returned non-OK"
+      );
       return { isValid: false, error: "Invalid Sage credentials" };
     }
 
-    const data = await response.json();
+    const validateResult = hasJson ? await response.json() : await response.text();
+    const isValid = validateResult === true || validateResult === "true";
+
+    if (!isValid) {
+      return { isValid: false, error: "Invalid Sage credentials" };
+    }
+
     try {
       await makeApiCall("Company/Get", username, password);
-      return { isValid: true, data };
-    } catch {
+      return { isValid: true };
+    } catch (error) {
+      moduleLogger.warn({ error, username }, "Sage credentials valid but API access check failed");
       return {
         isValid: false,
         error: "Your Sage account doesn't have proper API access permissions.",
