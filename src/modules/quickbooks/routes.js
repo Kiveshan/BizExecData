@@ -38,9 +38,9 @@ router.get("/auth", (req, res) => {
   qbRouteLogger.debug("Initiating QuickBooks OAuth flow");
   
   // Handle error display from query params (non-invasive)
-  const { error, support } = req.query;
-  if (error === 'reconnect_required' && support) {
-    qbRouteLogger.info({ support }, "QuickBooks reconnection required with support contact");
+  const { error } = req.query;
+  if (error === 'reconnect_required') {
+    qbRouteLogger.info({ }, "QuickBooks reconnection required");
   }
   
   const state = crypto.randomBytes(24).toString("hex");
@@ -169,7 +169,7 @@ router.get(authurl, async (req, res) => {
     ) {
       qbRouteLogger.warn({ userid: existingUser.userid, status: existingUser.status }, "QuickBooks user access denied");
       return res.redirect(
-        `/?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact our support team.`
+        `/?message=Your account is ${existingUser.status} and your License is ${exsistingLicense?.status}. Please contact support for assistance.`
       );
     }
 
@@ -297,7 +297,7 @@ router.get("/update", async (req, res) => {
       qbRouteLogger.error({ error: e, startOfMonth }, "Error processing QuickBooks data for month");
       if (isReconnectRequiredError(e)) {
         // Add support contact for reconnection errors (non-invasive)
-        return res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        return res.redirect("/quickbooks/auth?error=reconnect_required");
       }
     }
 
@@ -332,7 +332,7 @@ router.get("/fetch-income", async (req, res) => {
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting income data from QuickBooks");
       if (isReconnectRequiredError(err)) {
-        res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        res.redirect("/quickbooks/auth?error=reconnect_required");
         return;
       }
       res.status(500).send("Error occurred while extracting and storing data.");
@@ -370,7 +370,7 @@ router.get("/fetch-cost", async (req, res) => {
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting cost data from QuickBooks");
       if (isReconnectRequiredError(err)) {
-        res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        res.redirect("/quickbooks/auth?error=reconnect_required");
         return;
       }
       res.status(500).send("Error occurred while extracting and storing data.");
@@ -408,7 +408,7 @@ router.get("/fetch-expenses", async (req, res) => {
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting expenses data from QuickBooks");
       if (isReconnectRequiredError(err)) {
-        res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        res.redirect("/quickbooks/auth?error=reconnect_required");
         return;
       }
       res.status(500).send("Error occurred while extracting and storing data.");
@@ -446,7 +446,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting other expenses data from QuickBooks");
       if (isReconnectRequiredError(err)) {
-        res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        res.redirect("/quickbooks/auth?error=reconnect_required");
         return;
       }
       res.status(500).send("Error occurred while extracting and storing data.");
@@ -485,7 +485,7 @@ router.get("/fetch-otherincome", async (req, res) => {
     } catch (err) {
       qbRouteLogger.error({ err, startOfMonth }, "Error extracting other income data from QuickBooks");
       if (isReconnectRequiredError(err)) {
-        res.redirect("/quickbooks/auth?error=reconnect_required&support=support@biztech.com");
+        res.redirect("/quickbooks/auth?error=reconnect_required");
         return;
       }
       res.status(500).send("Error occurred while extracting and storing data.");
