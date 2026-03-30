@@ -341,7 +341,20 @@
         if (confirmedInput.value !== 'true') {
           e.preventDefault();
           const email = document.getElementById('email').value;
+          const password = document.getElementById('password').value;
           try {
+            const validateResponse = await fetch('/validate-sage-credentials', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password })
+            });
+
+            const validateData = await validateResponse.json();
+            if (!validateResponse.ok || !validateData.isValid) {
+              alert(validateData.error || 'Invalid Sage credentials');
+              return;
+            }
+
             const response = await fetch('/check-user-exists', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -355,7 +368,7 @@
             }
           } catch (err) {
             console.error('Error checking if user exists:', err);
-            loginForm.submit();
+            alert('Could not validate Sage credentials. Please try again.');
           }
         }
       });
