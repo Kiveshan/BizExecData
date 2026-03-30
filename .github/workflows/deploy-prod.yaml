@@ -31,7 +31,7 @@ jobs:
       - name: Prisma migrate deploy
         run: npx prisma migrate deploy
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:SpeakFriendEnter@bizexec-prod.cr8kiww8ao7m.af-south-1.rds.amazonaws.com:5432/postgres?schema=public
 
       - name: Run ESLint
         run: npm run lint
