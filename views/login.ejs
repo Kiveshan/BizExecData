@@ -4,166 +4,224 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* General styling */
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: white;
-            font-family: Arial, sans-serif;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --cyan:        #00BDD6;
+            --cyan-dark:   #0099B0;
+            --cyan-glow:   rgba(0, 189, 214, 0.12);
+            --ink:         #0B1120;
+            --ink-soft:    #2E3A4A;
+            --muted:       #6B7A8D;
+            --surface:     #F2F6FA;
+            --card-bg:     #FFFFFF;
+            --border:      rgba(0, 189, 214, 0.18);
+            --radius-lg:   18px;
+            --radius-md:   12px;
+            --shadow-card: 0 4px 24px rgba(11,17,32,0.08);
         }
 
-        /* Navbar styling */
+        body {
+            background-color: var(--surface);
+            font-family: 'DM Sans', sans-serif;
+            color: var(--ink-soft);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
         .navbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 20px;
-            background-color: white;
-            border-bottom: 1px solid #ccc;
+            padding: 0 40px;
+            height: 72px;
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 10px rgba(11,17,32,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .navbar .logo {
             display: flex;
             align-items: center;
+            gap: 14px;
+            text-decoration: none;
         }
 
         .navbar .logo img {
-            height: 50px;
-            margin-right: 10px;
+            height: 44px;
+            width: auto;
         }
 
-        .navbar .logo h3 {
-            font-size: 18px;
-            font-weight: bold;
-            color: #00BDD6;
-            margin: 0;
+        .navbar .logo-text {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .navbar .logo-text .brand {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--cyan);
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        .navbar .logo-text .tagline {
+            font-size: 0.65rem;
+            font-weight: 400;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
 
         .navbar .nav-links {
             list-style: none;
             display: flex;
-            margin: 0;
-            padding: 0;
-        }
-
-        .navbar .nav-links li {
-            margin-left: 20px;
+            gap: 10px;
         }
 
         .navbar .nav-links li a {
             text-decoration: none;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            padding: 10px 20px;
-            background-color: #00BDD6;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 9px 22px;
+            background-color: var(--cyan);
+            border-radius: 9px;
+            letter-spacing: 0.01em;
+            transition: background-color 0.2s, transform 0.15s;
+            display: inline-block;
         }
 
         .navbar .nav-links li a:hover {
-            background-color: #009bb0;
+            background-color: var(--cyan-dark);
+            transform: translateY(-1px);
         }
 
-        /* Center the form container */
         .form-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 90vh;
-            flex-direction: column;
+            min-height: calc(100vh - 72px);
+            display: grid;
+            place-items: center;
+            padding: 46px 18px 70px;
         }
 
-        form {
-            background-color: #f7f7f7;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        .auth-card {
             width: 100%;
-            max-width: 400px;
+            max-width: 440px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            padding: 28px 24px 22px;
         }
 
-        form h1 {
-            font-size: 24px;
-            color: #00BDD6;
+        .auth-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: var(--ink);
+            letter-spacing: -0.02em;
+            text-align: center;
             margin-bottom: 10px;
-            text-align: center;
         }
 
-        form h2 {
-            font-size: 16px;
-            color: gray;
-            margin-bottom: 20px;
+        .auth-subtitle {
             text-align: center;
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            margin-bottom: 18px;
         }
 
-        /* Styling for the form fields */
-        input[type="email"],
-        input[type="password"] {
+        .form-field {
             width: 100%;
-            padding: 12px 15px;
-            margin: 8px 0;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 14px;
-            color: #333;
+            padding: 12px 14px;
+            margin: 10px 0;
+            border: 1px solid rgba(11,17,32,0.14);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            color: var(--ink-soft);
+            background: #fff;
+            outline: none;
+            transition: box-shadow 0.2s, border-color 0.2s;
         }
 
-        /* Login button */
-        button {
+        .form-field:focus {
+            border-color: rgba(0, 189, 214, 0.65);
+            box-shadow: 0 0 0 4px var(--cyan-glow);
+        }
+
+        .primary-btn {
             width: 100%;
             padding: 12px;
-            background-color: #00BDD6;
+            margin-top: 14px;
+            background-color: var(--cyan);
             border: none;
-            border-radius: 5px;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 700;
             cursor: pointer;
-            margin-top: 15px;
+            transition: background-color 0.2s, transform 0.15s;
         }
 
-        button:hover {
-            background-color: #009bb0;
+        .primary-btn:hover {
+            background-color: var(--cyan-dark);
+            transform: translateY(-1px);
         }
 
-        /* Register link styling */
-        p {
+        .auth-footer {
             text-align: center;
-            margin-top: 15px;
-            font-size: 14px;
-            color: gray;
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: var(--muted);
         }
 
-        p a {
-            color: #00BDD6;
+        .auth-footer a {
+            color: var(--cyan);
             text-decoration: none;
+            font-weight: 600;
         }
 
-        p a:hover {
+        .auth-footer a:hover {
             text-decoration: underline;
         }
 
-        /* Error message styling */
         .error-message {
-            color: red;
+            background: rgba(244, 67, 54, 0.12);
+            border: 1px solid rgba(244, 67, 54, 0.28);
+            color: #b42318;
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
             text-align: center;
-            margin-bottom: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        @media (max-width: 640px) {
+            .navbar { padding: 0 20px; }
         }
     </style>
 </head>
 <body>
     <header>
         <nav class="navbar">
-            <div class="logo">
-                <a href="/index">
-                    <img src="logo_biz.png" alt="Navbar Logo">
-                </a>
-                <h3>Business Executive Data</h3>
-            </div>
+            <a class="logo" href="/index">
+                <img src="logo_biz.png" alt="Business Executive Logo">
+                <div class="logo-text">
+                    <span class="brand">Business Executive</span>
+                    <span class="tagline">Accurate Analytics &middot; Live Dashboards</span>
+                </div>
+            </a>
             <ul class="nav-links">
                 <li><a href="/login">Login</a></li>
                 <li><a href="/register">Register</a></li>
@@ -172,9 +230,9 @@
     </header>
 
     <div class="form-container">
-        <form action="/login" method="post">
-            <h1>Login to your account</h1>
-            <h2>Enter your credentials to access your account</h2>
+        <form class="auth-card" action="/login" method="post">
+            <h1 class="auth-title">Login to your account</h1>
+            <h2 class="auth-subtitle">Enter your credentials to access your account</h2>
 
             <% if (typeof error !== 'undefined') { %>
                 <div class="error-message">
@@ -182,10 +240,10 @@
                 </div>
             <% } %>
 
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-            <p>Don't have an account? <a href="/register">Register</a></p>
+            <input class="form-field" type="email" name="email" placeholder="Email" required>
+            <input class="form-field" type="password" name="password" placeholder="Password" required>
+            <button class="primary-btn" type="submit">Login</button>
+            <p class="auth-footer">Don't have an account? <a href="/register">Register</a></p>
         </form>
     </div>
 </body>

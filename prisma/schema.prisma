@@ -1,0 +1,224 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model user_table {
+  userid               Int       @id @default(autoincrement())
+  firstname            String    @db.VarChar(50)
+  surname              String    @db.VarChar(50)
+  company_name         String?   @db.VarChar(100)
+  email                String?   @unique @db.VarChar(100)
+  address              String?
+  telephone            String?   @db.VarChar(20)
+  password             String?
+  accounting_software  String?   @db.VarChar(50)
+  company_services     String?
+  created_at           DateTime? @default(now())
+  updated_at           DateTime? @default(now())
+  roleid               Int?
+  status               String?   @default("pending") @db.VarChar(50)
+  first_time_insertion Boolean?
+  company_id           BigInt?
+  xero_company_id      String?   @db.Uuid
+  sage_company_id      BigInt?
+
+  company_calcs       company_calcs[]
+  costofsales         costofsales[]
+  excel_companydata   excel_companydata[]
+  expenses            expenses[]
+  revenue             revenue[]
+  sage_company_calcs  sage_company_calcs[]
+  sage_costofsales    sage_costofsales[]
+  sage_expenses       sage_expenses[]
+  sage_revenue        sage_revenue[]
+  xero_company_calcs  xero_company_calcs[]
+  xero_costofsales    xero_costofsales[]
+  xero_expenses       xero_expenses[]
+  xero_revenue        xero_revenue[]
+  quickbooks_oauth_token quickbooks_oauth_token?
+
+  roles roles? @relation(fields: [roleid], references: [roleid])
+}
+
+model roles {
+  roleid   Int    @id @default(autoincrement())
+  rolename String @db.VarChar(100)
+
+  user_table user_table[]
+}
+
+model company_calcs {
+  calcid      Int      @id @default(autoincrement())
+  userid      Int?
+  grossprofit Decimal?
+  opexpenses  Decimal?
+  netprofit   Decimal?
+  sumofsales  Decimal?
+  sumofcost   Decimal?
+  date        DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid])
+}
+
+model costofsales {
+  costofsalesid Int      @id @default(autoincrement())
+  costofsales   Decimal?
+  date          DateTime? @db.Date
+  userid        Int?
+  category      String?
+  transaction_id Int?
+
+  user_table user_table? @relation(fields: [userid], references: [userid])
+}
+
+model excel_companydata {
+  id          Int      @id @default(autoincrement())
+  userid      Int?
+  category    String?
+  subcategory String?
+  date        DateTime? @db.Date
+  amount      Decimal?
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model expenses {
+  expenseid     Int      @id @default(autoincrement())
+  category      String?
+  expenses      Decimal?
+  date          DateTime? @db.Date
+  userid        Int?
+  transaction_id Int?
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model license_management {
+  licenseid       Int      @id @default(autoincrement())
+  owner_name      String?
+  company_name    String?
+  status          String?
+  date_submitted  DateTime? @db.Date
+  expiration_date DateTime? @db.Date
+  userid          String?
+}
+
+model revenue {
+  revenue_id    Int      @id @default(autoincrement())
+  revenue       Decimal?
+  date          DateTime? @db.Date
+  userid        Int?
+  category      String?
+  transaction_id Int?
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model sage_company_calcs {
+  sage_calc_id Int      @id @default(autoincrement())
+  userid       Int?
+  grossprofit  Decimal?
+  opexpenses   Decimal?
+  netprofit    Decimal?
+  sumofsales   Decimal?
+  sumofcost    Decimal?
+  date         DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model sage_costofsales {
+  costofsalesid Int      @id @default(autoincrement())
+  userid        Int?
+  category      String?
+  costofsales   Decimal?
+  date          DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model sage_expenses {
+  expenseid Int      @id @default(autoincrement())
+  userid    Int?
+  category  String?
+  amount    Decimal?
+  date      DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model sage_revenue {
+  revenueid Int      @id @default(autoincrement())
+  userid    Int?
+  category  String?
+  revenue   Decimal?
+  date      DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model xero_company_calcs {
+  xero_calc_id Int      @id @default(autoincrement())
+  userid       Int?
+  grossprofit  Decimal?
+  opexpenses   Decimal?
+  netprofit    Decimal?
+  sumofsales   Decimal?
+  sumofcost    Decimal?
+  date         DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model xero_costofsales {
+  costofsalesid Int      @id @default(autoincrement())
+  userid        Int?
+  category      String?
+  costofsales   Decimal?
+  date          DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model xero_expenses {
+  expenseid Int      @id @default(autoincrement())
+  userid    Int?
+  category  String?
+  amount    Decimal?
+  date      DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model xero_revenue {
+  revenueid Int      @id @default(autoincrement())
+  userid    Int?
+  category  String?
+  revenue   Decimal?
+  date      DateTime? @db.Date
+
+  user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}
+
+model quickbooks_oauth_token {
+  id            Int      @id @default(autoincrement())
+  userid        Int      @unique
+  realm_id      String?
+  access_token  String
+  refresh_token String
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user_table user_table @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
+}

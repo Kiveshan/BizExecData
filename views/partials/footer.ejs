@@ -1,0 +1,84 @@
+<style>
+  .footer {
+    background: #fff;
+    border-top: 1px solid rgba(0,189,214,0.18);
+    color: #6B7A8D;
+    text-align: center;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    z-index: 50;
+    transition: left 0.25s ease, width 0.25s ease;
+  }
+
+  /* Shift with sidebar when present */
+  body.sidebar-collapsed .footer {
+    left: 56px;
+    width: calc(100% - 56px);
+  }
+
+  body:not(.sidebar-collapsed) .footer.sidebar-offset {
+    left: 230px;
+    width: calc(100% - 230px);
+  }
+
+  .footer-dot {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(0,189,214,0.4);
+    vertical-align: middle;
+  }
+
+  .footer a {
+    color: #00BDD6;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.18s;
+  }
+
+  .footer a:hover { color: #0099B0; }
+</style>
+
+<footer class="footer" id="appFooter">
+  <span>&copy; <%= new Date().getFullYear() %> Business Executive</span>
+  <span class="footer-dot"></span>
+  <span>All rights reserved</span>
+  <span class="footer-dot"></span>
+  <a href="/eula">EULA</a>
+  <span class="footer-dot"></span>
+  <a href="/privacy-policy">Privacy Policy</a>
+</footer>
+
+<script>
+  (function () {
+    const footer  = document.getElementById('appFooter');
+    const sidebar = document.getElementById('appSidebar');
+    if (!footer || !sidebar) return;
+
+    function syncFooter() {
+      if (sidebar.classList.contains('collapsed')) {
+        footer.style.left  = '56px';
+        footer.style.width = 'calc(100% - 56px)';
+      } else {
+        footer.style.left  = '230px';
+        footer.style.width = 'calc(100% - 230px)';
+      }
+    }
+
+    // Observe sidebar class changes so footer stays in sync
+    new MutationObserver(syncFooter).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+    syncFooter();
+  })();
+</script>

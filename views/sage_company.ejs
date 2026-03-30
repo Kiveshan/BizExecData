@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Overview — Sage</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:        #00BDD6;
+      --cyan-dark:   #0099B0;
+      --cyan-glow:   rgba(0,189,214,0.10);
+      --ink:         #0B1120;
+      --ink-soft:    #2E3A4A;
+      --muted:       #6B7A8D;
+      --surface:     #F2F6FA;
+      --card-bg:     #FFFFFF;
+      --border:      rgba(0,189,214,0.18);
+      --radius-lg:   16px;
+      --radius-md:   10px;
+      --shadow-card: 0 4px 20px rgba(11,17,32,0.07);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface);
+      color: var(--ink-soft);
+      min-height: 100vh;
+    }
+
+    .main-content {
+      margin-left: 230px;
+      padding: 28px 32px 80px;
+      transition: margin-left 0.25s ease;
+      animation: fadeUp 0.45s ease both;
+    }
+
+    body.sidebar-collapsed .main-content { margin-left: 56px; }
+
+    .main-content > h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+    }
+
+    /* ── KPI cards ─────────────────────────────── */
+    .totals-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .date-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-card);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .date-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: var(--cyan);
+      border-radius: 4px 0 0 4px;
+    }
+
+    .date-card p {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .date-card .kpi-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+
+    /* ── Filters bar ───────────────────────────── */
+    .filters-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      padding: 16px 22px;
+      margin-bottom: 24px;
+    }
+
+    .filter-dropdowns { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+
+    .filter-dropdowns > div > h3,
+    .filter-container > div > h3 {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .dropdown { position: relative; display: inline-block; }
+
+    .dropdown select {
+      appearance: none;
+      background: var(--card-bg);
+      color: var(--ink-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 9px 36px 9px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      min-width: 150px;
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+
+    .dropdown select:hover,
+    .dropdown select:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px var(--cyan-glow);
+    }
+
+    .dropdown::after {
+      content: '▾';
+      position: absolute;
+      top: 50%; right: 12px;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--cyan);
+      font-size: 0.9rem;
+    }
+
+    .filter-container { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+    .slider-container { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .switch { position: relative; display: inline-block; width: auto; height: auto; }
+    .switch input { display: none; }
+
+    .switch .slider {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 20px;
+      border-radius: 100px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: background 0.18s, color 0.18s, border-color 0.18s;
+      user-select: none;
+      position: static;
+    }
+
+    .switch input:checked + .slider { background: var(--cyan); border-color: var(--cyan); color: #fff; }
+    .switch .slider:hover { border-color: var(--cyan); color: var(--cyan); }
+    .switch input:checked + .slider:hover { color: #fff; }
+    .switch .slider:before { display: none; }
+    .slider-text { display: none; }
+
+    /* ── Charts ────────────────────────────────── */
+    .chart-container {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .chart-item {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-card);
+      padding: 22px 24px 18px;
+    }
+
+    .chart-item h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <%- include("partials/sage_navbar") %>
+  <%- include("partials/sage_sidebar") %>
+
+  <div class="main-content">
+  
+
+    <!-- KPI Cards -->
+    <div class="totals-container">
+      <div class="date-card">
+        <p>Gross Profit</p>
+        <div class="kpi-value" id="totalGrossProfit">R0.00</div>
+      </div>
+      <div class="date-card">
+        <p>Expenses</p>
+        <div class="kpi-value" id="totalExpenses">R0.00</div>
+      </div>
+      <div class="date-card">
+        <p>Net Profit</p>
+        <div class="kpi-value" id="totalNetProfit">R0.00</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+      <div class="filter-dropdowns">
+        <div>
+          <h3>Year</h3>
+          <div class="dropdown">
+            <select id="yearSelect" class="dropdown-select">
+              <option value="">All years</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <h3>Month</h3>
+          <div class="dropdown">
+            <select id="monthSelect" class="dropdown-select">
+              <option value="">All months</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="filter-container">
+        <div>
+          <h3>Trends</h3>
+          <div class="slider-container">
+            <label class="switch">
+              <input type="checkbox" id="sixMonthsToggle" checked>
+              <span class="slider">6 Months</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="threeMonthsToggle">
+              <span class="slider">3 Months</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts stacked -->
+    <div class="chart-container">
+      <div class="chart-item">
+        <h2>Sales, Cost of Sales &amp; Gross Profit</h2>
+        <canvas id="financialChart"></canvas>
+      </div>
+      <div class="chart-item">
+        <h2>Net Profit per Month</h2>
+        <canvas id="ProfitChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let grossData = [];
+      let profitData = [];
+      let financialChart;
+      let ProfitChart;
+
+      function formatMonth(dateString) { return new Date(dateString).toLocaleString('default', { month: 'long' }); }
+      function formatYear(dateString)  { return new Date(dateString).getFullYear().toString(); }
+      function formatMonthYear(dateString) {
+        const d = new Date(dateString);
+        return `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+      }
+
+      function populateYearButtons(years, lastYear) {
+        const sel = document.getElementById('yearSelect');
+        sel.innerHTML = '<option value="">All years</option>';
+        Array.from(new Set(years)).forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
+        sel.addEventListener('change', updateCharts);
+        sel.value = lastYear;
+      }
+
+      function populateMonthButtons(labels, lastMonth) {
+        const sel = document.getElementById('monthSelect');
+        sel.innerHTML = '<option value="">All months</option>';
+        Array.from(new Set(labels)).forEach(l => { const o = document.createElement('option'); o.value = l; o.textContent = l; sel.appendChild(o); });
+        sel.addEventListener('change', updateCharts);
+        sel.value = lastMonth;
+      }
+
+      function getSelectedMonths() { const v = document.getElementById('monthSelect').value; return v ? [v] : []; }
+      function getSelectedYears()  { const v = document.getElementById('yearSelect').value;  return v ? [v] : []; }
+
+      function filterData(sm, sy, data) {
+        return data.filter(row => {
+          const rm = formatMonth(row.date), ry = formatYear(row.date);
+          if (!sm.length && !sy.length) return true;
+          if (!sm.length) return sy.includes(ry);
+          if (!sy.length) return sm.includes(rm);
+          return sm.includes(rm) && sy.includes(ry);
+        });
+      }
+
+      function updateCharts() {
+        const sm = getSelectedMonths(), sy = getSelectedYears();
+        const fg = filterData(sm, sy, grossData);
+        const fp = filterData(sm, sy, profitData);
+        updateFinancialChart(fg);
+        updateProfitChart(fp);
+        calculateTotals(fp);
+        if (sm.length || sy.length) {
+          document.getElementById('sixMonthsToggle').checked = false;
+          document.getElementById('threeMonthsToggle').checked = false;
+        }
+      }
+
+      function updateFinancialChart(d) {
+        financialChart.data.labels = d.map(r => formatMonthYear(r.date));
+        financialChart.data.datasets[0].data = d.map(r => parseFloat(r.sumofsales.replace(/R|\s/g,'').replace(',','.')));
+        financialChart.data.datasets[1].data = d.map(r => parseFloat(r.sumofcost.replace(/R|\s/g,'').replace(',','.')));
+        financialChart.data.datasets[2].data = d.map(r => parseFloat(r.grossprofit.replace(/R|\s/g,'').replace(',','.')));
+        financialChart.update();
+      }
+
+      function updateProfitChart(d) {
+        ProfitChart.data.labels = d.map(r => formatMonthYear(r.date));
+        ProfitChart.data.datasets[0].data = d.map(r => parseFloat(r.grossprofit.replace(/R|\s/g,'').replace(',','.')));
+        ProfitChart.data.datasets[1].data = d.map(r => parseFloat(r.opexpenses.replace(/R|\s/g,'').replace(',','.')));
+        ProfitChart.data.datasets[2].data = d.map(r => parseFloat(r.netprofit.replace(/R|\s/g,'').replace(',','.')));
+        ProfitChart.update();
+      }
+
+      function calculateTotals(data) {
+        let gp = 0, ex = 0, np = 0;
+        data.forEach(r => {
+          gp += parseFloat(r.grossprofit.replace(/R|\s/g,'').replace(',','.')) || 0;
+          ex += parseFloat(r.opexpenses.replace(/R|\s/g,'').replace(',','.'))  || 0;
+          np += parseFloat(r.netprofit.replace(/R|\s/g,'').replace(',','.'))   || 0;
+        });
+        const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('totalGrossProfit').textContent = `R${fmt(gp)}`;
+        document.getElementById('totalExpenses').textContent   = `R${fmt(ex)}`;
+        document.getElementById('totalNetProfit').textContent   = `R${fmt(np)}`;
+      }
+
+      function getLast6MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-6); return data.filter(r => new Date(r.date) >= ago); }
+      function getLast3MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-3); return data.filter(r => new Date(r.date) >= ago); }
+
+      const chartDefaults = {
+        responsive: true,
+        plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 }, color: '#2E3A4A' } } },
+        scales: {
+          x: { grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } }
+        }
+      };
+
+      function initializeCharts(grossData, profitData) {
+        financialChart = new Chart(document.getElementById('financialChart').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: grossData.map(r => formatMonthYear(r.date)),
+            datasets: [
+              { label: 'Sales',        data: grossData.map(r => parseFloat(r.sumofsales.replace(/R|\s/g,'').replace(',','.'))),  borderColor: '#00BDD6', backgroundColor: 'rgba(0,189,214,0.75)',   borderWidth: 1 },
+              { label: 'Cost of Sales',data: grossData.map(r => parseFloat(r.sumofcost.replace(/R|\s/g,'').replace(',','.'))),   borderColor: '#F97066', backgroundColor: 'rgba(249,112,102,0.75)', borderWidth: 1 },
+              { label: 'Gross Profit', data: grossData.map(r => parseFloat(r.grossprofit.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#A78BFA', backgroundColor: 'rgba(167,139,250,0.75)', borderWidth: 1 }
+            ]
+          },
+          options: chartDefaults
+        });
+
+        ProfitChart = new Chart(document.getElementById('ProfitChart').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: profitData.map(r => formatMonthYear(r.date)),
+            datasets: [
+              { label: 'Gross Profit', data: profitData.map(r => parseFloat(r.grossprofit.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#00BDD6', backgroundColor: 'rgba(0,189,214,0.75)',  borderWidth: 1 },
+              { label: 'Expenses',     data: profitData.map(r => parseFloat(r.opexpenses.replace(/R|\s/g,'').replace(',','.'))),  borderColor: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.75)', borderWidth: 1 },
+              { label: 'Net Profit',   data: profitData.map(r => parseFloat(r.netprofit.replace(/R|\s/g,'').replace(',','.'))),   borderColor: '#34D399', backgroundColor: 'rgba(52,211,153,0.75)', borderWidth: 1 }
+            ]
+          },
+          options: chartDefaults
+        });
+
+        calculateTotals(profitData);
+      }
+
+      function fetchDefaultMonthYear() {
+        Promise.all([
+          fetch('/api/sagecompany').then(r => r.json()),
+          fetch('/api/sageprofit').then(r => r.json())
+        ])
+        .then(([companyData, profitDataResponse]) => {
+          grossData  = companyData.data;
+          profitData = profitDataResponse;
+          const lastEntryDate = companyData.lastEntryDate;
+          populateMonthButtons(grossData.map(r => formatMonth(r.date)), formatMonth(lastEntryDate));
+          populateYearButtons(grossData.map(r => formatYear(r.date)),   formatYear(lastEntryDate));
+          initializeCharts(grossData, profitData);
+          updateCharts();
+        })
+        .catch(err => console.error('Error fetching data:', err));
+      }
+
+      function fetchLast6MonthsData() {
+        fetch('/api/sagecompany').then(r => r.json()).then(d => { grossData = d.data; updateFinancialChart(getLast6MonthsData(grossData)); });
+        fetch('/api/sageprofit').then(r => r.json()).then(d => { profitData = d; const p = getLast6MonthsData(profitData); updateProfitChart(p); calculateTotals(p); });
+      }
+
+      function fetchLast3MonthsData() {
+        fetch('/api/sagecompany').then(r => r.json()).then(d => { grossData = d.data; updateFinancialChart(getLast3MonthsData(grossData)); });
+        fetch('/api/sageprofit').then(r => r.json()).then(d => { profitData = d; const p = getLast3MonthsData(profitData); updateProfitChart(p); calculateTotals(p); });
+      }
+
+      document.getElementById('sixMonthsToggle').addEventListener('change', function() {
+        if (this.checked) { document.getElementById('threeMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; fetchLast6MonthsData(); }
+      });
+      document.getElementById('threeMonthsToggle').addEventListener('change', function() {
+        if (this.checked) { document.getElementById('sixMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; fetchLast3MonthsData(); }
+      });
+
+      fetchDefaultMonthYear();
+    });
+  </script>
+</body>
+</html>

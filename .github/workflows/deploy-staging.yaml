@@ -1,0 +1,64 @@
+name: Deploy to Elastic Beanstalk Staging
+on:
+  push:
+    branches:
+      - staging
+env:
+  AWS_REGION: af-south-1 # Replace with your AWS region
+  EB_APPLICATION_NAME: BizExecData-staging # Replace with your Elastic Beanstalk application name
+  EB_ENVIRONMENT_NAME: BizExecData-staging-env # Replace with your Elastic Beanstalk environment name
+  S3_BUCKET_NAME: bizexec-versions-staging # Replace with your S3 bucket name
+  DEPLOYMENT_PACKAGE: BizExecData-${{ github.sha }}.zip
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Prisma migrate deploy
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate deployment package
+        run: zip -r ${{ env.DEPLOYMENT_PACKAGE }} . -x '*.git*' 'node_modules/*' 'coverage/*'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload to S3
+        run: aws s3 cp ${{ env.DEPLOYMENT_PACKAGE }} s3://${{ env.S3_BUCKET_NAME }}/
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APPLICATION_NAME }}
+          environment_name: ${{ env.EB_ENVIRONMENT_NAME }}
+          version_label: ${{ github.sha }}
+          region: ${{ env.AWS_REGION }}
+          deployment_package: ${{ env.DEPLOYMENT_PACKAGE }}

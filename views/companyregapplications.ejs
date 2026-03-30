@@ -1,211 +1,310 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Company Registration Approvals</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company Registration Approvals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #00BDD6;
-            padding: 10px 20px;
-            color: white;
-        }
+    :root {
+      --cyan:        #00BDD6;
+      --cyan-dark:   #0099B0;
+      --cyan-glow:   rgba(0,189,214,0.10);
+      --ink:         #0B1120;
+      --ink-soft:    #2E3A4A;
+      --muted:       #6B7A8D;
+      --surface:     #F2F6FA;
+      --card-bg:     #FFFFFF;
+      --border:      rgba(0,189,214,0.18);
+      --danger:      #E53935;
+      --danger-dark: #B71C1C;
+      --radius-lg:   16px;
+      --radius-md:   10px;
+      --shadow-sm:   0 2px 10px rgba(11,17,32,0.06);
+    }
 
-        /* Back button styling */
-        .back-button {
-            background-color: green;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 16px;
-        }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface);
+      color: var(--ink-soft);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-        .back-button:hover {
-            background-color: #2980b9;
-        }
+    /* ── Header ─────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      height: 64px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
 
-        /* Logout button styling */
-        .logout-button {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
+    .header-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-        .logout-button:hover {
-            background-color: #c0392b;
-        }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
 
-        /* Content */
-        .content {
-            padding: 20px;
-            background-color: #ecf0f1;
-            flex-grow: 1;
-        }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 18px;
+      border-radius: var(--radius-md);
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.18s, transform 0.12s;
+    }
 
-        /* Tabs */
-        .tabs {
-    display: flex;
-    justify-content: space-around; /* Distributes the tabs evenly with equal space around */
-    margin-bottom: 20px;
-}
+    .btn:hover { transform: translateY(-1px); }
 
-.tab {
-    padding: 10px 20px;
-    cursor: pointer;
-    background-color: #00BDD6;
-    color: white;
-    border-radius: 5px;
-    text-align: center;
-    flex-grow: 1; /* Make each tab take up equal width */
-    margin: 0 10px; /* Adds some margin between the tabs */
-}
+    .btn-back {
+      background: var(--cyan-glow);
+      color: var(--cyan-dark);
+      border: 1px solid var(--border);
+    }
 
-.tab.active {
-    background-color: #2980b9;
-}
-        /* Table Styles */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
+    .btn-back:hover { background: rgba(0,189,214,0.20); }
+    .btn-logout { background: var(--danger); color: #fff; }
+    .btn-logout:hover { background: var(--danger-dark); }
 
-        table th, table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
+    /* ── Content ────────────────────────────────── */
+    .content {
+      flex: 1;
+      padding: 32px 40px 80px;
+      animation: fadeUp 0.45s ease both;
+    }
 
-        table th {
-            background-color: #00BDD6;
-            color: white;
-        }
+    /* ── Tabs ───────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
 
-        table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
+    .tab {
+      padding: 8px 22px;
+      border-radius: 100px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #fff;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      transition: background 0.18s, color 0.18s, border-color 0.18s;
+      user-select: none;
+    }
 
-        table tr:hover {
-            background-color: #f5f5f5;
-        }
+    .tab:hover { color: var(--cyan); border-color: var(--cyan); }
 
-        /* Action button */
-        .action-button {
-            background-color: #00BDD6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            display: inline-block;
-        }
+    .tab.active {
+      background: var(--cyan);
+      color: #fff;
+      border-color: var(--cyan);
+    }
 
-        .action-button:hover {
-            background-color: #2980b9;
-        }
+    /* ── Table Card ─────────────────────────────── */
+    .table-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(11,17,32,0.07);
+      overflow: hidden;
+    }
 
-        /* Ensure link inside button is styled */
-        .action-button a {
-            color: white;
-            text-decoration: none;
-            display: block;
-        }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-        .action-button a:hover {
-            color: white;
-        }
-    </style>
+    thead tr {
+      background: var(--cyan);
+    }
+
+    thead th {
+      padding: 14px 18px;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(0,189,214,0.09);
+      transition: background 0.15s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: rgba(242,246,250,0.7); }
+    tbody tr:hover { background: var(--cyan-glow); }
+
+    tbody td {
+      padding: 13px 18px;
+      font-size: 0.87rem;
+      color: var(--ink-soft);
+    }
+
+    /* ── Status Pill ────────────────────────────── */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: capitalize;
+    }
+
+    .status-pill.pending  { background: rgba(255,160,0,0.12); color: #E65100; }
+    .status-pill.approved { background: rgba(0,189,100,0.12); color: #1B5E20; }
+    .status-pill.rejected { background: rgba(229,57,53,0.12);  color: var(--danger); }
+    .status-pill.default  { background: var(--cyan-glow); color: var(--cyan-dark); }
+
+    /* ── View Button ────────────────────────────── */
+    .action-button {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 16px;
+      border-radius: 8px;
+      background: var(--cyan-glow);
+      color: var(--cyan-dark);
+      border: 1px solid var(--border);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.18s, transform 0.12s;
+    }
+
+    .action-button:hover {
+      background: rgba(0,189,214,0.22);
+      transform: translateY(-1px);
+    }
+
+    /* ── Footer ─────────────────────────────────── */
+    .footer {
+      background: var(--cyan);
+      color: #fff;
+      text-align: center;
+      position: fixed;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
 
-    <div class="header">
-        <a href="/adminmenu" class="back-button">Back</a>
-        <h1>Company Registrations</h1>
-        <form action="/logout?_method=DELETE" method="POST" class="logout-form">
-            <button class="logout-button" type="submit">Logout</button>
-        </form>
+  <div class="header">
+    <a href="/adminmenu" class="btn btn-back">← Back</a>
+    <span class="header-title">Company Registrations</span>
+    <div class="header-actions">
+      <form action="/logout?_method=DELETE" method="POST">
+        <button class="btn btn-logout" type="submit">Logout</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="tabs">
+      <div class="tab active" data-filter="all">All</div>
+      <div class="tab" data-filter="quickbooks">QuickBooks</div>
+      <div class="tab" data-filter="xero">Xero</div>
+      <div class="tab" data-filter="excel">Excel</div>
+      <div class="tab" data-filter="sage">Sage</div>
     </div>
 
-    <div class="content">
-
-        <div class="tabs">
-            <div class="tab" data-filter="quickbooks">QuickBooks</div>
-            <div class="tab" data-filter="xero">Xero</div>
-            <div class="tab" data-filter="excel">Excel</div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Company Name</th>
-                    <th>Date Submitted</th>
-                    <th>Software</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <% applications.forEach(application => { %>
-                <tr class="<%= application.accounting_software.toLowerCase() %>">
-                    <td><%= application.userid %></td>
-                    <td><%= application.company_name %></td>
-                    <td><%= new Date(application.created_at).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
-                    <td><%= application.accounting_software %></td>
-                    <td><%= application.status %></td>
-                    <td><button class="action-button"><a href="/companyregdetails/<%= application.userid %>">View</a></button></td>
-                </tr>
-                <% }) %>
-            </tbody>
-        </table>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Company Name</th>
+            <th>Date Submitted</th>
+            <th>Software</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% applications.forEach(application => { %>
+          <tr class="<%= application.accounting_software.toLowerCase() %>">
+            <td><%= application.userid %></td>
+            <td><%= application.company_name %></td>
+            <td><%= new Date(application.created_at).toISOString().slice(0, 10).replace(/-/g, '/') %></td>
+            <td><%= application.accounting_software %></td>
+            <td>
+              <%
+                const s = (application.status || '').toLowerCase();
+                const cls = s === 'pending' ? 'pending' : s === 'approved' ? 'approved' : s === 'rejected' ? 'rejected' : 'default';
+              %>
+              <span class="status-pill <%= cls %>"><%= application.status %></span>
+            </td>
+            <td>
+              <a href="/companyregdetails/<%= application.userid %>" class="action-button">View</a>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
     </div>
 
-    <script>
-        // Get all tab elements and add click event listeners
-        const tabs = document.querySelectorAll('.tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove 'active' class from all tabs and add to clicked tab
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
+  </div>
 
-                // Get the filter value from the clicked tab
-                const filter = tab.getAttribute('data-filter');
+  <div class="footer">© Business Executive</div>
 
-                // Get all table rows
-                const rows = document.querySelectorAll('tbody tr');
-
-                // Show/Hide rows based on the filter
-                rows.forEach(row => {
-                    if (row.classList.contains(filter)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-            });
+  <script>
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const filter = tab.getAttribute('data-filter');
+        document.querySelectorAll('tbody tr').forEach(row => {
+          row.style.display = (filter === 'all' || row.classList.contains(filter)) ? '' : 'none';
         });
-    </script>
+      });
+    });
+  </script>
 
 </body>
 </html>

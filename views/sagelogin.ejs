@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sage Login — Business Executive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:       #00BDD6;
+      --cyan-dark:  #0099B0;
+      --cyan-glow:  rgba(0,189,214,0.12);
+      --ink:        #0B1120;
+      --ink-soft:   #2E3A4A;
+      --muted:      #6B7A8D;
+      --surface:    #F2F6FA;
+      --card-bg:    #FFFFFF;
+      --border:     rgba(0,189,214,0.18);
+      --danger:     #E53935;
+      --radius-lg:  16px;
+      --radius-md:  10px;
+      --shadow-sm:  0 2px 10px rgba(11,17,32,0.06);
+      --shadow-card:0 8px 32px rgba(11,17,32,0.10);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface);
+      color: var(--ink-soft);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Navbar ──────────────────────────────────── */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 40px;
+      height: 72px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .navbar .logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+    }
+
+    .navbar .logo img { height: 44px; width: auto; }
+
+    .navbar .logo-text .brand {
+      display: block;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .navbar .logo-text .tagline {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ── Page body ───────────────────────────────── */
+    .form-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      animation: fadeUp 0.45s ease both;
+    }
+
+    /* ── Login card ──────────────────────────────── */
+    .login-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-card);
+      padding: 40px 40px 36px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .login-card .card-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      background: var(--cyan-glow);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 14px;
+      margin-bottom: 20px;
+    }
+
+    .login-card h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .login-card h2 {
+      font-size: 0.88rem;
+      font-weight: 400;
+      color: var(--muted);
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* ── Error ───────────────────────────────────── */
+    .error-message {
+      background: rgba(229,57,53,0.08);
+      border: 1px solid rgba(229,57,53,0.22);
+      color: var(--danger);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 0.84rem;
+      font-weight: 500;
+      margin-bottom: 18px;
+    }
+
+    /* ── Inputs ──────────────────────────────────── */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      color: var(--ink-soft);
+      background: var(--surface);
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+
+    input[type="email"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px var(--cyan-glow);
+      background: #fff;
+    }
+
+    /* ── Submit button ───────────────────────────── */
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: var(--cyan);
+      border: none;
+      border-radius: var(--radius-md);
+      color: white;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.15s ease;
+      margin-top: 4px;
+    }
+
+    .btn-login:hover { background: var(--cyan-dark); transform: translateY(-1px); }
+
+    /* ── Modal ───────────────────────────────────── */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      inset: 0;
+      background: rgba(11,17,32,0.45);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.open { display: flex; }
+
+    .modal-content {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(11,17,32,0.18);
+      padding: 32px 32px 28px;
+      width: 100%;
+      max-width: 480px;
+      animation: fadeUp 0.25s ease both;
+    }
+
+    .modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+
+    .modal-text {
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    .modal-text ul {
+      margin: 10px 0 0 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .modal-button {
+      padding: 9px 22px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.12s;
+    }
+
+    .modal-button:hover { transform: translateY(-1px); }
+
+    .modal-button-cancel {
+      background: var(--surface);
+      color: var(--ink-soft);
+      border: 1px solid var(--border);
+    }
+
+    .modal-button-cancel:hover { background: #e8edf2; }
+
+    .modal-button-confirm { background: var(--cyan); color: #fff; }
+    .modal-button-confirm:hover { background: var(--cyan-dark); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <nav class="navbar">
+      <a href="/index" class="logo">
+        <img src="logo_biz.png" alt="Business Executive Logo">
+        <div class="logo-text">
+          <span class="brand">Business Executive</span>
+          <span class="tagline">Accurate Analytics &middot; Live Dashboards</span>
+        </div>
+      </a>
+    </nav>
+  </header>
+
+  <div class="form-container">
+    <div class="login-card">
+      <span class="card-eyebrow">Sage</span>
+      <h1>Login to your account</h1>
+      <h2>Enter your Sage credentials to access your dashboard</h2>
+
+      <% if (typeof error !== 'undefined') { %>
+        <div class="error-message"><%= error %></div>
+      <% } %>
+
+      <form id="loginForm" action="/sagelogin" method="post">
+        <div class="input-group">
+          <input type="email"    name="email"    id="email"    placeholder="Email address" required>
+          <input type="password" name="password" id="password" placeholder="Password"      required>
+        </div>
+        <input type="hidden" name="confirmed" id="confirmed" value="false">
+        <button type="submit" class="btn-login">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Registration Confirmation Modal -->
+  <div id="registrationModal" class="modal">
+    <div class="modal-content">
+      <h3 class="modal-title">New Account Registration</h3>
+      <p class="modal-text">
+        We don't have an account with these credentials yet. If you continue:
+        <ul>
+          <li>We'll create a new account using your Sage credentials</li>
+          <li>We'll connect to your Sage account to retrieve your company information</li>
+          <li>Your financial data will be imported for analysis</li>
+        </ul>
+        Would you like to proceed with registration?
+      </p>
+      <div class="modal-buttons">
+        <button id="cancelRegistration"  class="modal-button modal-button-cancel">Cancel</button>
+        <button id="confirmRegistration" class="modal-button modal-button-confirm">Yes, Register</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const loginForm          = document.getElementById('loginForm');
+      const registrationModal  = document.getElementById('registrationModal');
+      const confirmRegistration = document.getElementById('confirmRegistration');
+      const cancelRegistration  = document.getElementById('cancelRegistration');
+      const confirmedInput      = document.getElementById('confirmed');
+
+      loginForm.addEventListener('submit', async function(e) {
+        if (confirmedInput.value !== 'true') {
+          e.preventDefault();
+          const email = document.getElementById('email').value;
+          try {
+            const response = await fetch('/check-user-exists', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email })
+            });
+            const data = await response.json();
+            if (!data.exists) {
+              registrationModal.classList.add('open');
+            } else {
+              loginForm.submit();
+            }
+          } catch (err) {
+            console.error('Error checking if user exists:', err);
+            loginForm.submit();
+          }
+        }
+      });
+
+      confirmRegistration.addEventListener('click', function() {
+        confirmedInput.value = 'true';
+        registrationModal.classList.remove('open');
+        loginForm.submit();
+      });
+
+      cancelRegistration.addEventListener('click', function() {
+        registrationModal.classList.remove('open');
+      });
+
+      window.addEventListener('click', function(event) {
+        if (event.target === registrationModal) {
+          registrationModal.classList.remove('open');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

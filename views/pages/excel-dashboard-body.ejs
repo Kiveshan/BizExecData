@@ -1,0 +1,63 @@
+<header>
+  <nav class="navbar">
+    <div class="logo">
+      <img src="Excel2.jpg" alt="Excel Dashboard Logo">
+      <h3>Excel Dashboard</h3>
+    </div>
+    <form action="/logout?_method=DELETE" method="POST" class="logout-form">
+      <button class="logout-button" type="submit">Logout</button>
+    </form>
+  </nav>
+</header>
+
+<main>
+  <div id="message-box" class="alert"></div>
+
+  <div class="tiles">
+    <a href="/upload" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="upload.png" alt="Upload">
+        </div>
+        <h2>Upload</h2>
+        <span class="tile-cta">Upload new data &rarr;</span>
+      </div>
+    </a>
+
+    <a href="/amending" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="amend.png" alt="Amend">
+        </div>
+        <h2>Amend Current Month</h2>
+        <span class="tile-cta">Edit this month &rarr;</span>
+      </div>
+    </a>
+
+    <a href="/excompany" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="bar-graph.png" alt="Dashboard">
+        </div>
+        <h2>Dashboard</h2>
+        <span class="tile-cta">View analytics &rarr;</span>
+      </div>
+    </a>
+  </div>
+
+  <%- include('../partials/footer') %>
+
+  <script>
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+    const message = getQueryParam('message');
+    if (message) {
+      const messageBox = document.getElementById('message-box');
+      messageBox.textContent = message;
+      messageBox.style.display = 'block';
+      setTimeout(() => { messageBox.style.display = 'none'; }, 3000);
+    }
+  </script>
+</main>

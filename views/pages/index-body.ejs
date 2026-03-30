@@ -1,0 +1,88 @@
+<header>
+  <nav class="navbar">
+    <div class="logo">
+      <img src="logo_biz.png" alt="Business Executive Logo">
+      <div class="logo-text">
+        <span class="brand">Business Executive</span>
+        <span class="tagline">Accurate Analytics &middot; Live Dashboards</span>
+      </div>
+    </div>
+    <ul class="nav-links">
+      <!-- add links here if needed -->
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-eyebrow">Live Dashboards</div>
+    <h1>Real-time insights for<br><em>data-driven decisions</em></h1>
+    <p>Connect your accounting platform and instantly access dynamic financial dashboards that surface the metrics that matter most to your business.</p>
+  </section>
+
+  <div id="message-box" class="alert"></div>
+
+  <p class="section-label">Connect your platform</p>
+
+  <div class="tiles">
+
+    <a href="/auth">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="quickbooks-brand-preferred-logo-50-50-black-external.png" alt="QuickBooks">
+        </div>
+        <div class="tile-img-wrap" style="height:auto;">
+          <img src="C2QB_green_btn_short_default_2x.png" alt="Connect to QuickBooks" style="max-height:38px;">
+        </div>
+        <span class="tile-cta">Get started &rarr;</span>
+      </div>
+    </a>
+
+    <a href="xero-connect" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="Xero.jpg" alt="Xero">
+        </div>
+        <span class="tile-label">Xero Login</span>
+        <span class="tile-cta">Get started &rarr;</span>
+      </div>
+    </a>
+
+    <a href="login" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="Excel2.jpg" alt="Excel">
+        </div>
+        <span class="tile-label">Excel Login</span>
+        <span class="tile-cta">Get started &rarr;</span>
+      </div>
+    </a>
+
+    <a href="sagelogin" style="text-decoration:none;">
+      <div class="tile">
+        <div class="tile-img-wrap">
+          <img src="Sage.png" alt="Sage">
+        </div>
+        <span class="tile-label">Sage Login</span>
+        <span class="tile-cta">Get started &rarr;</span>
+      </div>
+    </a>
+
+  </div>
+
+  <%- include('../partials/footer') %>
+
+  <script>
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+    const message = getQueryParam('message');
+    if (message) {
+      const box = document.getElementById('message-box');
+      box.textContent = message;
+      box.style.display = 'block';
+      setTimeout(() => { box.style.display = 'none'; }, 3000);
+    }
+  </script>
+</main>

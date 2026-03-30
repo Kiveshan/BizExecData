@@ -1,0 +1,249 @@
+<%- include('../partials/ex_navbar') %>
+
+<div id="sidebar">
+  <%- include('../partials/ex_sidebar') %>
+</div>
+
+<div class="main-content">
+
+
+  <!-- KPI Cards -->
+  <div class="totals-container">
+    <div class="date-card">
+      <p>Gross Profit</p>
+      <div class="kpi-value" id="totalGrossProfit">R0.00</div>
+    </div>
+    <div class="date-card">
+      <p>Expenses</p>
+      <div class="kpi-value" id="totalExpenses">R0.00</div>
+    </div>
+    <div class="date-card">
+      <p>Net Profit</p>
+      <div class="kpi-value" id="totalNetProfit">R0.00</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filter-dropdowns">
+      <div>
+        <h3>Year</h3>
+        <div class="dropdown">
+          <select id="yearSelect" class="dropdown-select"><option value="">All years</option></select>
+        </div>
+      </div>
+      <div>
+        <h3>Month</h3>
+        <div class="dropdown">
+          <select id="monthSelect" class="dropdown-select"><option value="">All months</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="filter-container">
+      <div>
+        <h3>Trends</h3>
+        <div class="slider-container">
+          <label class="switch"><input type="checkbox" id="sixMonthsToggle" checked><span class="slider">6 Months</span></label>
+          <label class="switch"><input type="checkbox" id="threeMonthsToggle"><span class="slider">3 Months</span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts stacked -->
+  <div class="chart-container">
+    <div class="chart-item">
+      <h2>Sales, Cost of Sales &amp; Gross Profit</h2>
+      <canvas id="financialChart"></canvas>
+    </div>
+    <div class="chart-item">
+      <h2>Net Profit per Month</h2>
+      <canvas id="ProfitChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let grossData = [];
+      let profitData = [];
+      let financialChart;
+      let ProfitChart;
+
+      function formatMonth(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString('default', { month: 'long' });
+      }
+
+      function formatYear(dateString) {
+        const date = new Date(dateString);
+        return date.getFullYear().toString();
+      }
+
+      function formatMonthYear(dateString) {
+        const date = new Date(dateString);
+        const month = date.toLocaleString('default', { month: 'long' });
+        const year = date.getFullYear();
+        return `${month} ${year}`;
+      }
+
+      function populateYearButtons(years, lastYear) {
+        const yearSelect = document.getElementById('yearSelect');
+        yearSelect.innerHTML = '<option value="">All years</option>';
+        const uniqueYears = Array.from(new Set(years));
+        uniqueYears.forEach(year => {
+          const option = document.createElement('option');
+          option.value = year; option.textContent = year;
+          yearSelect.appendChild(option);
+        });
+        yearSelect.addEventListener('change', updateCharts);
+        yearSelect.value = lastYear;
+      }
+
+      function populateMonthButtons(labels, lastMonth) {
+        const monthSelect = document.getElementById('monthSelect');
+        monthSelect.innerHTML = '<option value="">All months</option>';
+        const uniqueLabels = Array.from(new Set(labels));
+        uniqueLabels.forEach(label => {
+          const option = document.createElement('option');
+          option.value = label; option.textContent = label;
+          monthSelect.appendChild(option);
+        });
+        monthSelect.addEventListener('change', updateCharts);
+        monthSelect.value = lastMonth;
+      }
+
+      function getSelectedMonths() { const monthSelect = document.getElementById('monthSelect'); return monthSelect.value ? [monthSelect.value] : []; }
+      function getSelectedYears()  { const yearSelect  = document.getElementById('yearSelect');  return yearSelect.value  ? [yearSelect.value]  : []; }
+
+      function filterData(selectedMonths, selectedYears, data) {
+        return data.filter(row => {
+          const rowMonth = formatMonth(row.date);
+          const rowYear = formatYear(row.date);
+          if (selectedMonths.length === 0 && selectedYears.length === 0) return true;
+          if (selectedMonths.length === 0) return selectedYears.includes(rowYear);
+          if (selectedYears.length === 0) return selectedMonths.includes(rowMonth);
+          return selectedMonths.includes(rowMonth) && selectedYears.includes(rowYear);
+        });
+      }
+
+      function updateCharts() {
+        const selectedMonths = getSelectedMonths();
+        const selectedYears = getSelectedYears();
+        const filteredFinancialData = filterData(selectedMonths, selectedYears, grossData);
+        const filteredProfitData    = filterData(selectedMonths, selectedYears, profitData);
+        updateFinancialChart(filteredFinancialData);
+        updateProfitChart(filteredProfitData);
+        calculateTotals(filteredProfitData);
+        if (selectedMonths.length > 0 || selectedYears.length > 0) {
+          document.getElementById('sixMonthsToggle').checked = false;
+          document.getElementById('threeMonthsToggle').checked = false;
+        }
+      }
+
+      function updateFinancialChart(filteredData) {
+        financialChart.data.labels = filteredData.map(row => formatMonthYear(row.date));
+        financialChart.data.datasets[0].data = filteredData.map(row => parseFloat(row.netsales.replace(/R|\s/g, '').replace(',', '.')));
+        financialChart.data.datasets[1].data = filteredData.map(row => parseFloat(row.costofsales.replace(/R|\s/g, '').replace(',', '.')));
+        financialChart.data.datasets[2].data = filteredData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g, '').replace(',', '.')));
+        financialChart.update();
+      }
+
+      function updateProfitChart(filteredData) {
+        ProfitChart.data.labels = filteredData.map(row => formatMonthYear(row.date));
+        ProfitChart.data.datasets[0].data = filteredData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g, '').replace(',', '.')));
+        ProfitChart.data.datasets[1].data = filteredData.map(row => parseFloat(row.expenses.replace(/R|\s/g, '').replace(',', '.')));
+        ProfitChart.data.datasets[2].data = filteredData.map(row => parseFloat(row.otherincome.replace(/R|\s/g, '').replace(',', '.')));
+        ProfitChart.data.datasets[3].data = filteredData.map(row => parseFloat(row.netprofit.replace(/R|\s/g, '').replace(',', '.')));
+        ProfitChart.update();
+      }
+
+      function calculateTotals(data) {
+        let totalGrossProfit = 0, totalExpenses = 0, totalNetProfit = 0;
+        data.forEach(row => {
+          totalGrossProfit += parseFloat(row.grossprofit.replace(/R|\s/g, '').replace(',', '.')) || 0;
+          totalExpenses    += parseFloat(row.expenses.replace(/R|\s/g, '').replace(',', '.'))    || 0;
+          totalNetProfit   += parseFloat(row.netprofit.replace(/R|\s/g, '').replace(',', '.'))   || 0;
+        });
+        const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('totalGrossProfit').textContent = `R${fmt(totalGrossProfit)}`;
+        document.getElementById('totalExpenses').textContent    = `R${fmt(totalExpenses)}`;
+        document.getElementById('totalNetProfit').textContent   = `R${fmt(totalNetProfit)}`;
+      }
+
+      function getLast6MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-6); return data.filter(row => new Date(row.date) >= ago); }
+      function getLast3MonthsData(data) { const ago = new Date(); ago.setMonth(ago.getMonth()-3); return data.filter(row => new Date(row.date) >= ago); }
+
+      const chartDefaults = {
+        responsive: true,
+        plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 }, color: '#2E3A4A' } } },
+        scales: {
+          x: { grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,189,214,0.07)' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6B7A8D' } }
+        }
+      };
+
+      function fetchDefaultMonthYear() {
+        Promise.all([
+          fetch('/api/excompany').then(response => response.json()),
+          fetch('/api/exprofit').then(response => response.json())
+        ])
+        .then(([companyData, profitDataResponse]) => {
+          grossData  = companyData.financialData;
+          profitData = profitDataResponse;
+          const lastEntryDate = companyData.lastEntryDate;
+          populateMonthButtons(grossData.map(row => formatMonth(row.date)), formatMonth(lastEntryDate));
+          populateYearButtons(grossData.map(row => formatYear(row.date)),   formatYear(lastEntryDate));
+
+          financialChart = new Chart(document.getElementById('financialChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: grossData.map(row => formatMonthYear(row.date)),
+              datasets: [
+                { label: 'Net Sales',     data: grossData.map(row => parseFloat(row.netsales.replace(/R|\s/g,'').replace(',','.'))),    borderColor: '#00BDD6', backgroundColor: 'rgba(0,189,214,0.75)',   borderWidth: 1 },
+                { label: 'Cost of Sales', data: grossData.map(row => parseFloat(row.costofsales.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#F97066', backgroundColor: 'rgba(249,112,102,0.75)', borderWidth: 1 },
+                { label: 'Gross Profit',  data: grossData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#A78BFA', backgroundColor: 'rgba(167,139,250,0.75)', borderWidth: 1 }
+              ]
+            },
+            options: chartDefaults
+          });
+
+          ProfitChart = new Chart(document.getElementById('ProfitChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: profitData.map(row => formatMonthYear(row.date)),
+              datasets: [
+                { label: 'Gross Profit',  data: profitData.map(row => parseFloat(row.grossprofit.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#00BDD6', backgroundColor: 'rgba(0,189,214,0.75)',   borderWidth: 1 },
+                { label: 'Expenses',      data: profitData.map(row => parseFloat(row.expenses.replace(/R|\s/g,'').replace(',','.'))),    borderColor: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.75)',  borderWidth: 1 },
+                { label: 'Other Income',  data: profitData.map(row => parseFloat(row.otherincome.replace(/R|\s/g,'').replace(',','.'))), borderColor: '#34D399', backgroundColor: 'rgba(52,211,153,0.75)',  borderWidth: 1 },
+                { label: 'Net Profit',    data: profitData.map(row => parseFloat(row.netprofit.replace(/R|\s/g,'').replace(',','.'))),   borderColor: '#F97066', backgroundColor: 'rgba(249,112,102,0.75)', borderWidth: 1 }
+              ]
+            },
+            options: chartDefaults
+          });
+
+          calculateTotals(profitData);
+          updateCharts();
+        })
+        .catch(error => console.error('Error fetching data:', error));
+      }
+
+      function fetchLast6MonthsData() {
+        fetch('/api/excompany').then(r => r.json()).then(d => { grossData = d.financialData; updateFinancialChart(getLast6MonthsData(grossData)); });
+        fetch('/api/exprofit').then(r => r.json()).then(d => { profitData = d; const p = getLast6MonthsData(profitData); updateProfitChart(p); calculateTotals(p); });
+      }
+      function fetchLast3MonthsData() {
+        fetch('/api/excompany').then(r => r.json()).then(d => { grossData = d.financialData; updateFinancialChart(getLast3MonthsData(grossData)); });
+        fetch('/api/exprofit').then(r => r.json()).then(d => { profitData = d; const p = getLast3MonthsData(profitData); updateProfitChart(p); calculateTotals(p); });
+      }
+
+      document.getElementById('sixMonthsToggle').addEventListener('change', function() {
+        if (this.checked) { document.getElementById('threeMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; fetchLast6MonthsData(); }
+      });
+      document.getElementById('threeMonthsToggle').addEventListener('change', function() {
+        if (this.checked) { document.getElementById('sixMonthsToggle').checked = false; document.getElementById('yearSelect').value = ''; document.getElementById('monthSelect').value = ''; fetchLast3MonthsData(); }
+      });
+
+      fetchDefaultMonthYear();
+    });
+</script>
