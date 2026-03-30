@@ -57,6 +57,16 @@ app.get("/company.html", (req, res) => {
   res.redirect(301, `/company${query}`);
 });
 
+app.get("/eula", (req, res) => {
+  serverLogger.debug({ path: "/eula" }, "Serving EULA page");
+  res.render("pages/eula");
+});
+
+app.get("/privacy-policy", (req, res) => {
+  serverLogger.debug({ path: "/privacy-policy" }, "Serving Privacy Policy page");
+  res.render("pages/privacy-policy");
+});
+
 app.get("/revenue.html", (req, res) => {
   serverLogger.debug({ path: req.path }, "Redirecting legacy revenue route");
   const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
