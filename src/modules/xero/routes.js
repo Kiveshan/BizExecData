@@ -116,7 +116,7 @@ router.get("/auth/xero/callback", async (req, res) => {
     ) {
       xeroRouteLogger.warn({ userid: user.userid, userStatus: user.status, licenseStatus: license?.status }, "Xero user access denied");
       return res.redirect(
-        `/?message=Your account is ${user.status} and your license is ${license?.status}. Please contact our support team.`
+        `/?message=Your account is ${user.status} and your license is ${license?.status}. Please contact support for assistance.`
       );
     }
 

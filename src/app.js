@@ -79,6 +79,28 @@ app.use(helmet({
 }));
 appLogger.debug("Helmet security middleware enabled");
 
+// Disable unsafe HTTP methods
+app.use((req, res, next) => {
+  if (req.method === 'TRACE' || req.method === 'TRACK' || req.method === 'CONNECT') {
+    return res.status(405).send('Method Not Allowed');
+  }
+  next();
+});
+
+// Cache control for sensitive pages
+app.use((req, res, next) => {
+  const sensitivePaths = ['/login', '/register', '/auth', '/callback', '/quickbooks/auth'];
+  const isSensitive = sensitivePaths.some(path => req.path.startsWith(path));
+  
+  if (isSensitive) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+appLogger.debug("Security middleware configured for sensitive pages");
+
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
