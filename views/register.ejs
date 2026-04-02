@@ -252,12 +252,86 @@
                 <input class="form-field" type="password" id="password" name="password" placeholder="Password" required>
                 <input class="form-field" type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
             </div>
+            <div id="password-requirements" style="margin-top: -5px; margin-bottom: 10px; font-size: 0.85rem; color: var(--muted);">
+                <div id="length-req" style="color: #dc3545;">✗ At least 8 characters</div>
+            </div>
             <input type="hidden" name="accounting_software" value="excel">
             <input class="form-field" type="text" name="company_services" placeholder="Products/Services" required>
             <button class="primary-btn" type="submit">Create Account</button>
             <p class="auth-footer">Already have an account? <a href="/login">Login</a></p>
         </form>
     </div>
+
+    <script>
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm_password');
+        const lengthReq = document.getElementById('length-req');
+        const submitBtn = document.querySelector('.primary-btn');
+
+        function validatePasswordStrength(password) {
+            const hasMinLength = password.length >= 8;
+            
+            // Update length requirement
+            if (hasMinLength) {
+                lengthReq.innerHTML = '✓ At least 8 characters';
+                lengthReq.style.color = '#28a745';
+            } else {
+                lengthReq.innerHTML = '✗ At least 8 characters';
+                lengthReq.style.color = '#dc3545';
+            }
+            
+            return hasMinLength;
+        }
+
+        function validatePasswordsMatch() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            if (confirmPassword && password !== confirmPassword) {
+                confirmPasswordInput.style.borderColor = '#dc3545';
+                return false;
+            } else if (confirmPassword && password === confirmPassword) {
+                confirmPasswordInput.style.borderColor = '#28a745';
+                return true;
+            } else {
+                confirmPasswordInput.style.borderColor = 'rgba(11,17,32,0.14)';
+                return false;
+            }
+        }
+
+        passwordInput.addEventListener('input', function() {
+            const isValid = validatePasswordStrength(this.value);
+            validatePasswordsMatch();
+            
+            // Update password field border color
+            if (this.value.length > 0) {
+                this.style.borderColor = isValid ? '#28a745' : '#dc3545';
+            } else {
+                this.style.borderColor = 'rgba(11,17,32,0.14)';
+            }
+        });
+
+        confirmPasswordInput.addEventListener('input', validatePasswordsMatch);
+
+        // Prevent form submission if passwords don't match
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            if (!validatePasswordStrength(password)) {
+                e.preventDefault();
+                passwordInput.focus();
+                return false;
+            }
+            
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                confirmPasswordInput.focus();
+                alert('Passwords do not match. Please make sure both passwords are identical.');
+                return false;
+            }
+        });
+    </script>
 
 </body>
 </html>
