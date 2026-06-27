@@ -1,4 +1,13 @@
 {
+  "name": "bizexecdata",
+  "version": "1.0.0",
+  "description": "Server-rendered Node/Express app that connects QuickBooks Online, Xero, Sage, or Excel/CSV uploads and normalises monthly P&L reports into a comparable PostgreSQL time series.",
+  "author": "Kiveshan Naidoo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kiveshan/BizExecData.git"
+  },
   "type": "module",
   "scripts": {
     "start": "node server.js",

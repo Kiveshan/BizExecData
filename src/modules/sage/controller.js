@@ -7,8 +7,16 @@ import { createModuleLogger } from "../../utils/logger.js";
 
 const moduleLogger = createModuleLogger("sage");
 
-const baseApiUrl = "https://resellers.accounting.sageone.co.za/api/2.0.0";
-const apiKey = "REDACTED";
+const baseApiUrl =
+  process.env.SAGE_BASE_API_URL ||
+  "https://resellers.accounting.sageone.co.za/api/2.0.0";
+const apiKey = process.env.SAGE_API_KEY;
+
+if (!apiKey) {
+  moduleLogger.warn(
+    "SAGE_API_KEY is not set — Sage extraction and credential validation will fail until it is configured."
+  );
+}
 
 export const extractionStatus = {
   sage: {},

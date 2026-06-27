@@ -173,12 +173,17 @@ QB_ENVIRONMENT=sandbox          # or "production"
 XERO_CLIENT_ID=your-xero-client-id
 XERO_CLIENT_SECRET=your-xero-client-secret
 XERO_REDIRECT_URI=http://localhost:3000/auth/xero/callback
+
+# Sage Business Cloud (reseller API)
+SAGE_API_KEY=your-sage-api-key
+# SAGE_BASE_API_URL is optional; defaults to the SA reseller endpoint in code.
 ```
 
 Notes:
 - `IV_LENGTH` is fixed at 16 in code and is not an env var.
+- `ENCRYPTION_KEY` has no fallback — it must be a 32-byte value in the environment or AES encryption/decryption will fail.
 - A legacy `src/config/database.js` reads `RDS_*` variables but the live data path uses `DATABASE_URL` via `src/config/prismaClient.js`.
-- Sage requires no env vars in the current code — its API key is set in the Sage controller.
+- `SAGE_API_KEY` is required for the Sage flows; it is read from the environment (no longer hardcoded).
 
 ### Tests and linting
 ```bash
