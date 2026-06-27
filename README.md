@@ -1,240 +1,234 @@
 # BizExecData
 
-A comprehensive business data management platform that integrates with multiple accounting software providers including QuickBooks, Xero, Sage, and Excel. The application provides centralized financial data analysis, reporting, and visualization capabilities.
+A server-rendered Node/Express application that lets a business connect one accounting data source — QuickBooks Online, Xero, Sage Business Cloud, or a manual Excel/CSV upload — and turns its monthly profit-and-loss reports into a comparable time series stored in PostgreSQL. Each source has a different authentication model and a structurally different report API, so the core of the system is an extraction layer that normalises four dissimilar shapes into a common `{category, amount, date}` row plus a monthly `{grossprofit, opexpenses, netprofit, sumofsales, sumofcost}` calc, then renders per-provider dashboards from those rows.
 
-## 🚀 Features
+## Architecture
 
-- **Multi-Platform Integration**: Connect with QuickBooks, Xero, Sage, and Excel data sources
-- **Financial Analytics**: Revenue, expenses, and cost of sales analysis
-- **User Management**: Role-based access control with authentication
-- **Data Visualization**: Charts and graphs powered by Chart.js and D3.js
-- **Secure Authentication**: Passport.js with local authentication strategy
-- **RESTful API**: Well-structured API endpoints for data operations
-- **Modern Stack**: Node.js, Express, Prisma ORM with PostgreSQL
+```mermaid
+flowchart TB
+    subgraph Browser
+        DASH["Per-provider EJS dashboards<br/>(Chart.js / D3)"]
+        LOAD["Loading page<br/>(polls extraction progress)"]
+    end
 
-## 🛠️ Tech Stack
+    subgraph App["Express app (server.js / src/app.js)"]
+        ROUTES["Route modules<br/>auth · user · admin ·<br/>quickbooks · xero · sage · excel"]
+        API["/api/* JSON endpoints"]
+        EXTRACT["Extraction layer<br/>(per-provider extractor/controller)"]
+        NORM["Normaliser →<br/>shared {category, amount, date}<br/>+ monthly calcs"]
+        PROG["In-memory progress map<br/>extractionStatus"]
+    end
 
-### Backend
-- **Runtime**: Node.js (ES Modules)
-- **Framework**: Express.js
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Passport.js with bcrypt
-- **Security**: Helmet, express-rate-limit
-- **Logging**: Pino with structured logging
-- **Testing**: Jest with Supertest
+    subgraph Auth["Authentication models"]
+        QBAUTH["QuickBooks: OAuth2<br/>tokens in DB + refresh"]
+        XAUTH["Xero: OAuth2<br/>tokens in session"]
+        SAUTH["Sage: Basic auth<br/>AES-encrypted creds in session"]
+    end
 
-### Frontend
-- **Templating**: EJS
-- **Styling**: Custom CSS
-- **Charts**: Chart.js, D3.js
-- **File Processing**: Excel file handling with xlsx
+    QBO["QuickBooks Online API<br/>ProfitAndLoss / ProfitAndLossDetail"]
+    XEROAPI["Xero Accounting API<br/>getReportProfitAndLoss"]
+    SAGEAPI["Sage Accounting API<br/>ProfitAndLoss/Get"]
+    XLS["Excel / TXT upload<br/>(fixed income-statement template)"]
 
-### Integrations
-- **QuickBooks**: intuit-oauth API
-- **Xero**: xero-node SDK
-- **Sage**: Custom integration
-- **Excel**: File upload and processing
+    DB[("PostgreSQL<br/>per-provider tables<br/>via Prisma + pg adapter")]
 
-## 📋 Prerequisites
+    DASH --> ROUTES
+    DASH --> API
+    LOAD --> PROG
 
-- Node.js 18+ 
-- PostgreSQL 12+
-- npm or yarn
+    ROUTES --> QBAUTH --> QBO
+    ROUTES --> XAUTH --> XEROAPI
+    ROUTES --> SAUTH --> SAGEAPI
+    ROUTES --> XLS
 
-## 🚀 Quick Start
+    QBO --> EXTRACT
+    XEROAPI --> EXTRACT
+    SAGEAPI --> EXTRACT
+    XLS --> EXTRACT
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Kiveshan/BizExecData.git
-   cd BizExecData
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your database and API credentials
-   ```
-
-4. **Set up the database**
-   ```bash
-   npx prisma migrate dev
-   npx prisma generate
-   ```
-
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-6. **Access the application**
-   Open [http://localhost:3000](http://localhost:3000) in your browser
-
-## 📁 Project Structure
-
-```
-BizExecData/
-├── src/
-│   ├── modules/          # Feature modules (auth, user, admin, etc.)
-│   ├── config/           # Configuration files
-│   ├── utils/            # Utility functions
-│   └── app.js           # Main Express app
-├── views/               # EJS templates
-│   ├── layouts/         # Page layouts
-│   ├── pages/           # Page templates
-│   └── partials/        # Reusable components
-├── public/              # Static assets
-├── prisma/              # Database schema and migrations
-└── tests/               # Test files
+    EXTRACT --> NORM --> DB
+    EXTRACT --> PROG
+    API --> DB
 ```
 
-## 🔧 Configuration
+## Tech stack
 
-### Environment Variables
+| Technology | Why it's here |
+|---|---|
+| Node.js (ES modules) + Express 4 | HTTP server and routing; modules are split by feature under `src/modules/*`. |
+| PostgreSQL | Relational store; financial data is naturally tabular and time-indexed. |
+| Prisma 7 + `@prisma/adapter-pg` | Typed DB access over an explicit `pg` connection pool, so SSL and pooling are controlled directly. |
+| Passport (local strategy) + bcrypt | Email/password auth for Excel/manual users; bcrypt for password hashing. |
+| `intuit-oauth` | QuickBooks OAuth2 client — handles the authorize/token/refresh exchange. |
+| `xero-node` | Xero OAuth2 + Accounting API SDK, including consent URL and report calls. |
+| `node-fetch` | Plain HTTP for the Sage REST API (Basic auth), which has no first-party SDK here. |
+| `jsonpath` | Extracts values from the deeply nested, differently-shaped P&L JSON of each provider. |
+| `xlsx` (SheetJS) | Parses uploaded income-statement workbooks by cell position. |
+| `express-session` | Server-side sessions; also the store for Xero tokens and encrypted Sage credentials. |
+| `express-rate-limit` | Limits login attempts (5 per 15 min) on `POST /login`. |
+| `helmet` | Security headers and a Content-Security-Policy. |
+| Node `crypto` (AES-256-CBC) | Encrypts the Sage password before it is held in the session. |
+| Chart.js + D3 | Client-side charts on the dashboards. |
+| EJS | Server-rendered views and partials per provider. |
+| Pino | Structured, per-module logging. |
+| Jest + Supertest | Tests for the app boot path and auth middleware. |
 
-Create a `.env` file with the following variables:
+## Key technical decisions
+
+### 1. Three authentication models with different credential lifetimes
+The brief expected "OAuth across three providers," but the code reflects what each provider actually offers, and the three are handled deliberately differently:
+
+- **QuickBooks — OAuth2 with DB-persisted tokens and explicit refresh.** Access and refresh tokens are stored per user in the `quickbooks_oauth_token` table with an `expires_at`. Every API call goes through `makeQuickBooksApiCall`, which refreshes the token when it is within 60 seconds of expiry ([client.js](src/modules/quickbooks/client.js)), writes the rotated token back, and retries once on failure. An `invalid_grant` response is treated specially: the stored token is deleted and a `QB_RECONNECT_REQUIRED` error bubbles up so routes can redirect the user back into the consent flow.
+- **Xero — OAuth2 with session-held tokens.** The `xero-node` client requests `offline_access` and the token set is stored on the session (`req.session.tokenSet`); refresh is delegated to the SDK rather than tracked against an `expires_at` of our own.
+- **Sage — HTTP Basic auth, not OAuth.** Sage's reseller API authenticates with the user's username/password on each request. The password is encrypted with AES-256-CBC and stored on the session ([sage/routes.js](src/modules/sage/routes.js)), then decrypted at extraction time ([sage/controller.js](src/modules/sage/controller.js)) to build the `Authorization` header.
+
+Keeping these separate — rather than forcing a single token abstraction — is what lets each provider use its native auth without pretending Sage is something it isn't.
+
+### 2. Normalising three structurally different report APIs into one shape
+There is no single source-agnostic table; instead each provider writes to its own tables (`company_calcs`/`revenue`/`expenses`/`costofsales`, `xero_*`, `sage_*`, `excel_companydata`) that share an identical **column shape**. The interesting work is in the per-provider extractors that converge on that shape from very different inputs:
+
+- **QuickBooks** returns an arbitrarily nested `Rows.Row` tree. A recursive walker (`findFinancialData`) descends `ColData`/`Rows`/`Header`, and `jsonpath` filters select line items by `group` (`Income`, `COGS`, `Expenses`, `OtherIncome`). Monthly totals are pulled from `Summary.ColData[6]` of the `ProfitAndLossDetail` report.
+- **Xero** returns report rows tagged by `rowType`; `jsonpath` selects `SummaryRow` cells by label (`Total Income`, `Total Operating Expenses`, `Gross Profit`, etc.) and line rows under titled sections.
+- **Sage** returns a tree keyed by `Description`; `jsonpath` selects `Sales`/`Expenses`/`Cost of Sales` children and reads totals from rows where `ReportingLevelType == 10`.
+
+All three funnel into the same `{userid, category, amount, date}` line rows and the same five-field monthly calc, so a dashboard query is identical regardless of source. The tradeoff — parallel per-provider tables instead of one unified table with a `source` column — keeps each provider's quirks isolated at the cost of duplicated table definitions.
+
+### 3. Excel/manual upload as a first-class fallback
+For businesses not on a supported cloud platform, an income-statement workbook (template in `uploads/`) can be uploaded directly. The parser ([excel/controller.js](src/modules/excel/controller.js)) is built around the template's conventions rather than a fixed row list:
+
+- The report date is read from cell **F3** (handling both native dates and Excel serial numbers).
+- Category is inferred **dynamically**: the parser walks rows top-to-bottom tracking the most recently seen header (`REVENUE`, `COST OF GOODS SOLD`, `OTHER INCOME`, `EXPENSES`, `TOTAL`) and assigns following line items to it — no hardcoded subcategory list.
+- Column **F (formula-computed) is preferred over column E (manual entry)**, so cached totals are captured correctly.
+- Label variants are normalised (`COGS` → `Cost of goods sold`, etc.), and recognised summary rows are reassigned to a `TOTAL` category so dashboard queries stay consistent.
+- Uploads are guarded against **future dates** and **duplicate months**; a separate amend flow upserts the current month and deletes subcategories that disappeared from the re-uploaded file.
+
+A rough `.txt` path also exists, defaulting all entries to `EXPENSES` — usable but the least structured of the inputs.
+
+### 4. Incremental, diff-based extraction instead of caching or rate-limiting
+There is no caching layer and no general API rate limiter for the provider calls. The efficiency decisions are in the extraction loop itself:
+
+- A `first_time_insertion` flag drives the range: **3 years back on first connect, 1 year on refresh**.
+- Writes are **diff-based** — a row is only updated when the incoming amount differs from what's stored, and only inserted when absent. Re-running extraction is therefore close to a no-op when nothing changed.
+- Calls are issued **sequentially, month by month** (`await` in series), which naturally throttles request volume. Sage additionally inserts a deliberate `setTimeout(1000)` between months to stay friendly to its API.
+- Progress is tracked in an **in-memory map** (`extractionStatus`) rather than the DB, exposed via `check-*-extraction` endpoints that the loading page polls, and cleaned up an hour after completion.
+
+## System design highlights
+
+- **Recursive P&L tree-walker.** `findFinancialData` in the QuickBooks extractor handles arbitrarily nested report sections with a single recursive function, applying whichever upsert (revenue/COGS/expenses) it's handed — the same routine serves income, cost, expense, and other-income passes.
+- **Background extraction with a polled progress map.** A `POST /start-*-extraction` kicks off processing without blocking the response; the client polls a `check-*-extraction` endpoint that reports `{progress, complete, total}` from the in-memory `extractionStatus` map and self-expires after an hour.
+- **Forced-reconnect on dead refresh tokens.** QuickBooks distinguishes a recoverable API error from an `invalid_grant`: the latter clears the stored token and surfaces `QB_RECONNECT_REQUIRED`, which routes turn into a redirect back to `/quickbooks/auth?error=reconnect_required` rather than a 500.
+- **OAuth state CSRF protection (QuickBooks).** The authorize step generates `crypto.randomBytes(24)`, stores it on the session, and the callback rejects mismatches with a 403 before exchanging the code.
+- **Dynamic-category Excel parsing.** Inferring category from the last-seen header (rather than a static map of expected rows) means the parser tolerates layout changes within the template without code edits.
+
+## Setup and running locally
+
+### Prerequisites
+- Node.js 20+
+- PostgreSQL 14+
+- Developer/sandbox app credentials for QuickBooks and Xero if you want to exercise those flows
+
+### Steps
+```bash
+git clone https://github.com/Kiveshan/BizExecData.git
+cd BizExecData
+npm install
+
+# create your env file (see variables below)
+# then generate the client and apply migrations
+npx prisma generate
+npx prisma migrate dev
+
+npm run dev      # nodemon on PORT (default 3000)
+# or
+npm start
+```
+
+Open `http://localhost:3000`.
+
+### Environment variables
+Create a `.env` file. **Use your own values — these are placeholders only.**
 
 ```env
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/bizexecdata"
-
 # Server
 PORT=3000
 NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000
+LOG_LEVEL=debug
 
-# Session
-SESSION_SECRET=your-secret-key
+# Database (Prisma + pg)
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/bizexecdata?schema=public
+DB_SSL=false
 
-# QuickBooks OAuth
-QUICKBOOKS_CLIENT_ID=your-qb-client-id
-QUICKBOOKS_CLIENT_SECRET=your-qb-client-secret
+# Session & encryption
+SESSION_SECRET=replace-with-a-long-random-string
+ENCRYPTION_KEY=replace-with-a-32-byte-key-exactly   # AES-256 requires exactly 32 bytes
 
-# Xero OAuth
+# QuickBooks OAuth (Intuit developer app)
+CLIENT_ID=your-quickbooks-client-id
+CLIENT_SECRET=your-quickbooks-client-secret
+REDIRECT_URI=http://localhost:3000/callback
+QB_ENVIRONMENT=sandbox          # or "production"
+
+# Xero OAuth (Xero developer app)
 XERO_CLIENT_ID=your-xero-client-id
 XERO_CLIENT_SECRET=your-xero-client-secret
+XERO_REDIRECT_URI=http://localhost:3000/auth/xero/callback
+
+# Sage Business Cloud (reseller API)
+SAGE_API_KEY=your-sage-api-key
+# SAGE_BASE_API_URL is optional; defaults to the SA reseller endpoint in code.
 ```
 
-### Database Setup
+Notes:
+- `IV_LENGTH` is fixed at 16 in code and is not an env var.
+- `ENCRYPTION_KEY` has no fallback — it must be a 32-byte value in the environment or AES encryption/decryption will fail.
+- A legacy `src/config/database.js` reads `RDS_*` variables but the live data path uses `DATABASE_URL` via `src/config/prismaClient.js`.
+- `SAGE_API_KEY` is required for the Sage flows; it is read from the environment (no longer hardcoded).
 
-1. Create a PostgreSQL database
-2. Run migrations: `npx prisma migrate dev`
-3. Generate Prisma client: `npx prisma generate`
-
-## 🧪 Testing
-
+### Tests and linting
 ```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
+npm test          # Jest (run via experimental VM modules)
 npm run test:watch
-
-# Run with coverage
-npm run test:coverage
+npm run lint
+npm run lint:fix
 ```
 
-## 📜 Available Scripts
+## Project structure
 
-- `npm start` - Start production server
-- `npm run dev` - Start development server with nodemon
-- `npm test` - Run test suite
-- `npm run test:watch` - Run tests in watch mode
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues
+```
+BizExecData/
+├── server.js                  # Entry point: mounts route modules, static assets, error handlers, listen()
+├── prisma.config.ts           # Prisma config
+├── prisma/
+│   ├── schema.prisma          # All models: user_table, roles, per-provider calc/line tables, oauth token
+│   └── migrations/            # SQL migration history
+├── src/
+│   ├── app.js                 # Express app: helmet, CORS, sessions, passport, rate limiter, file upload
+│   ├── config/                # env, prismaClient (pg pool + adapter), passport, security, legacy database.js
+│   ├── middleware/            # auth guards, admin guard, session factory, error handler
+│   ├── modules/               # Feature modules, each with routes + controller/extractor/client
+│   │   ├── auth/              #   local login/register
+│   │   ├── user/              #   user-facing pages/data
+│   │   ├── admin/             #   approval + license management
+│   │   ├── quickbooks/        #   OAuth client, token refresh, recursive P&L extractor
+│   │   ├── xero/              #   OAuth via xero-node, summary/line extractors
+│   │   ├── sage/              #   Basic-auth client, encrypted-credential extraction
+│   │   └── excel/             #   workbook/txt parsing, upload + amend flows
+│   └── utils/                 # crypto (AES), file/date helpers, logger, validation
+├── views/                     # EJS templates
+│   ├── layouts/               #   page layout
+│   ├── pages/                 #   per-provider head/body fragments
+│   └── partials/              #   navbars, sidebars, footer (per provider)
+├── public/                    # static assets, styles, legacy HTML
+├── uploads/                   # Excel income-statement template(s)
+└── .github/workflows/         # Elastic Beanstalk deploy (staging / prod)
+```
 
-## 🔐 Security Features
+## Limitations and things I'd change
 
-- Password hashing with bcrypt
-- Rate limiting on API endpoints
-- CSRF protection
-- Security headers with Helmet
-- Input validation and sanitization
-- Secure session management
-
-## 📊 API Endpoints
-
-### Authentication
-- `POST /login` - User login
-- `POST /register` - User registration
-- `POST /logout` - User logout
-
-### QuickBooks Integration
-- `GET /quickbooks/auth` - Initiate OAuth flow
-- `GET /quickbooks/callback` - OAuth callback
-- `GET /quickbooks/data` - Fetch financial data
-
-### Xero Integration
-- `GET /xero/auth` - Initiate OAuth flow
-- `GET /xero/callback` - OAuth callback
-- `GET /xero/data` - Fetch financial data
-
-### Data Management
-- `GET /revenue` - Get revenue data
-- `GET /expenses` - Get expense data
-- `GET /company` - Get company information
-
-## 🚀 Deployment
-
-### Production Build
-
-1. Set environment variables for production
-2. Build the application:
-   ```bash
-   npm run build
-   ```
-
-3. Run database migrations:
-   ```bash
-   npx prisma migrate deploy
-   ```
-
-4. Start the server:
-   ```bash
-   npm start
-   ```
-
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow ESLint configuration
-- Write tests for new features
-- Use semantic commit messages
-- Update documentation as needed
-
-
-
-## 🆘 Support
-
-For support and questions:
-
-- Create an issue on GitHub
-- Check the [documentation](docs/)
-- Review existing issues and discussions
-
-## 🔄 Version History
-
-- **v1.0.0** - Initial release with core functionality
-- **v1.1.0** - Added Sage integration
-- **v1.2.0** - Enhanced security features
-- **v1.3.0** - Improved data visualization
-
-## 🙏 Acknowledgments
-
-- [Express.js](https://expressjs.com/) - Web framework
-- [Prisma](https://www.prisma.io/) - Database ORM
-- [Chart.js](https://www.chartjs.org/) - Data visualization
-- [Passport.js](http://www.passportjs.org/) - Authentication middleware
-
----
+- **Provider clients are module-level singletons.** The `xero` and `intuit-oauth` clients hold mutable token/tenant state on a shared instance, so concurrent extraction for multiple users could interleave. A per-request or per-user client instance would be the correct fix.
+- **OAuth `state` is verified for QuickBooks but not for Xero.** The Xero callback should validate a stored `state` the same way the QuickBooks callback does.
+- **Test coverage is thin** — currently the app boot path and auth middleware. The extractors and normalisers are the highest-value targets for unit tests against recorded report fixtures.
+- **Provider data lives in parallel tables.** A single table with a `source` discriminator would remove the duplicated `xero_*`/`sage_*`/base schema and simplify cross-source comparison, at the cost of mixing provider quirks in one place.
+- **Sage uses Basic auth with credentials in the session.** This is a constraint of the API surface used here; an OAuth-based Sage integration would avoid handling the user's password at all.
+```
