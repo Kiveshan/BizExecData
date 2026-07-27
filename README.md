@@ -5,36 +5,40 @@ A server-rendered Node/Express application that lets a business connect one acco
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Browser
-        DASH["Per-provider EJS dashboards<br/>(Chart.js / D3)"]
-        LOAD["Loading page<br/>(polls extraction progress)"]
+flowchart TD
+    subgraph BROWSER["Browser"]
+        DASH["Per-provider dashboards<br/>EJS · Chart.js · D3"]
+        LOAD["Loading page"]
     end
 
-    subgraph App["Express app (server.js / src/app.js)"]
-        ROUTES["Route modules<br/>auth · user · admin ·<br/>quickbooks · xero · sage · excel"]
-        API["/api/* JSON endpoints"]
-        EXTRACT["Extraction layer<br/>(per-provider extractor/controller)"]
-        NORM["Normaliser →<br/>shared {category, amount, date}<br/>+ monthly calcs"]
-        PROG["In-memory progress map<br/>extractionStatus"]
+    subgraph APP["Express application — server.js · src/app.js"]
+        ROUTES["Route modules<br/>auth · user · admin<br/>quickbooks · xero · sage · excel"]
+        API["JSON endpoints<br/>api/*"]
     end
 
-    subgraph Auth["Authentication models"]
-        QBAUTH["QuickBooks: OAuth2<br/>tokens in DB + refresh"]
-        XAUTH["Xero: OAuth2<br/>tokens in session"]
-        SAUTH["Sage: Basic auth<br/>AES-encrypted creds in session"]
+    subgraph AUTH["Credential handling — one model per provider"]
+        QBAUTH["QuickBooks<br/>OAuth2 · tokens in DB<br/>refresh at expiry minus 60s"]
+        XAUTH["Xero<br/>OAuth2 · tokenSet in session<br/>SDK-managed refresh"]
+        SAUTH["Sage<br/>HTTP Basic<br/>AES-256-CBC creds in session"]
     end
 
-    QBO["QuickBooks Online API<br/>ProfitAndLoss / ProfitAndLossDetail"]
-    XEROAPI["Xero Accounting API<br/>getReportProfitAndLoss"]
-    SAGEAPI["Sage Accounting API<br/>ProfitAndLoss/Get"]
-    XLS["Excel / TXT upload<br/>(fixed income-statement template)"]
+    subgraph SOURCES["Data sources"]
+        QBO["QuickBooks Online<br/>ProfitAndLoss · Detail"]
+        XEROAPI["Xero Accounting<br/>getReportProfitAndLoss"]
+        SAGEAPI["Sage Accounting<br/>ProfitAndLoss/Get"]
+        XLS["Excel / TXT upload<br/>fixed template"]
+    end
 
-    DB[("PostgreSQL<br/>per-provider tables<br/>via Prisma + pg adapter")]
+    subgraph PIPE["Extraction pipeline"]
+        EXTRACT["Per-provider extractor<br/>sequential, month by month"]
+        NORM["Normaliser<br/>category · amount · date<br/>plus monthly calcs"]
+        PROG["extractionStatus<br/>in-memory progress map"]
+    end
 
-    DASH --> ROUTES
-    DASH --> API
-    LOAD --> PROG
+    DB[("PostgreSQL<br/>per-provider tables<br/>Prisma + pg adapter")]
+
+    DASH -->|connect / extract| ROUTES
+    DASH -->|read| API
 
     ROUTES --> QBAUTH --> QBO
     ROUTES --> XAUTH --> XEROAPI
@@ -47,8 +51,69 @@ flowchart TB
     XLS --> EXTRACT
 
     EXTRACT --> NORM --> DB
-    EXTRACT --> PROG
+    EXTRACT -.-> PROG
+    LOAD -.poll.-> PROG
     API --> DB
+
+    classDef browser fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef app fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef auth fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef source fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef pipe fill:#e0e7ff,stroke:#4f46e5,color:#312e81
+    classDef store fill:#ffe4e6,stroke:#e11d48,color:#881337
+
+    class DASH,LOAD browser
+    class ROUTES,API app
+    class QBAUTH,XAUTH,SAUTH auth
+    class QBO,XEROAPI,SAGEAPI,XLS source
+    class EXTRACT,NORM,PROG pipe
+    class DB store
+
+    style BROWSER fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style APP fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style AUTH fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style SOURCES fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style PIPE fill:#f8fafc,stroke:#94a3b8,color:#334155
+```
+
+### QuickBooks token lifecycle
+
+The most involved auth path. Every provider call routes through `makeQuickBooksApiCall`, which refreshes proactively, rotates the stored token, and distinguishes a dead grant from a transient failure ([client.js](src/modules/quickbooks/client.js)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant EX as Extractor
+    participant CL as makeQuickBooksApiCall
+    participant DB as quickbooks_oauth_token
+    participant QB as Intuit API
+
+    EX->>CL: request P&L report
+    CL->>DB: load token row
+    alt no stored token
+        CL-->>EX: QB_RECONNECT_REQUIRED
+    end
+
+    Note over CL: refresh if within 60s of expires_at
+    opt refresh needed
+        CL->>QB: oauthClient.refresh()
+        QB-->>CL: rotated access + refresh token
+        CL->>DB: upsert rotated token
+    end
+
+    CL->>QB: makeApiCall
+    alt success
+        QB-->>CL: report JSON + intuit_tid header
+        CL-->>EX: response
+    else invalid_grant
+        CL->>DB: delete token row
+        CL-->>EX: QB_RECONNECT_REQUIRED
+    else transient error
+        CL->>CL: refresh, then retry once
+        CL->>QB: makeApiCall
+        QB-->>CL: response
+        CL-->>EX: response
+    end
 ```
 
 ## Tech stack
@@ -118,6 +183,7 @@ There is no caching layer and no general API rate limiter for the provider calls
 - **Background extraction with a polled progress map.** A `POST /start-*-extraction` kicks off processing without blocking the response; the client polls a `check-*-extraction` endpoint that reports `{progress, complete, total}` from the in-memory `extractionStatus` map and self-expires after an hour.
 - **Forced-reconnect on dead refresh tokens.** QuickBooks distinguishes a recoverable API error from an `invalid_grant`: the latter clears the stored token and surfaces `QB_RECONNECT_REQUIRED`, which routes turn into a redirect back to `/quickbooks/auth?error=reconnect_required` rather than a 500.
 - **OAuth state CSRF protection (QuickBooks).** The authorize step generates `crypto.randomBytes(24)`, stores it on the session, and the callback rejects mismatches with a 403 before exchanging the code.
+- **`intuit_tid` capture for supportability.** Every QuickBooks call logs Intuit's transaction ID from the response headers — on both the success and error paths, checking three possible header locations — which is what Intuit asks for when raising a support case against a failed API call.
 - **Dynamic-category Excel parsing.** Inferring category from the last-seen header (rather than a static map of expected rows) means the parser tolerates layout changes within the template without code edits.
 
 ## Setup and running locally
@@ -125,7 +191,7 @@ There is no caching layer and no general API rate limiter for the provider calls
 ### Prerequisites
 - Node.js 20+
 - PostgreSQL 14+
-- Developer/sandbox app credentials for QuickBooks and Xero if you want to exercise those flows
+- Developer/sandbox app credentials for QuickBooks and Xero, and a Sage reseller API key, if you want to exercise those flows. The Excel upload path works without any provider credentials.
 
 ### Steps
 ```bash
@@ -133,8 +199,9 @@ git clone https://github.com/Kiveshan/BizExecData.git
 cd BizExecData
 npm install
 
-# create your env file (see variables below)
-# then generate the client and apply migrations
+cp .env.example .env      # then fill in your own values (see below)
+
+# generate the client and apply migrations
 npx prisma generate
 npx prisma migrate dev
 
@@ -221,7 +288,7 @@ BizExecData/
 │   └── partials/              #   navbars, sidebars, footer (per provider)
 ├── public/                    # static assets, styles, legacy HTML
 ├── uploads/                   # Excel income-statement template(s)
-└── .github/workflows/         # Elastic Beanstalk deploy (staging / prod)
+└── .github/workflows/         # Elastic Beanstalk deploy (prod, on push to main)
 ```
 
 ## Limitations and things I'd change
@@ -231,4 +298,7 @@ BizExecData/
 - **Test coverage is thin** — currently the app boot path and auth middleware. The extractors and normalisers are the highest-value targets for unit tests against recorded report fixtures.
 - **Provider data lives in parallel tables.** A single table with a `source` discriminator would remove the duplicated `xero_*`/`sage_*`/base schema and simplify cross-source comparison, at the cost of mixing provider quirks in one place.
 - **Sage uses Basic auth with credentials in the session.** This is a constraint of the API surface used here; an OAuth-based Sage integration would avoid handling the user's password at all.
-```
+
+## License
+
+[MIT](LICENSE).
