@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 740" width="1020" height="740"
+     role="img" aria-label="QuickBooks token lifecycle">
+  <title>QuickBooks token lifecycle</title>
+  <style>
+    .c    { fill: #f6f8fa; stroke: #d1d9e0; stroke-width: 1; }
+    .p    { fill: #ffffff; stroke: #d1d9e0; stroke-width: 1; }
+    .ttl  { font: 600 13.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #1f2328; }
+    .ttlm { font: 600 11.5px ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; fill: #1f2328; }
+    .sub  { font: 400 10px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; }
+    .code { font: 400 9.5px ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; fill: #59636e; }
+    .gut  { font: 600 10.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; letter-spacing: .09em; }
+    .lbl  { font: 400 9.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; }
+    .e    { fill: none; stroke: #818b98; stroke-width: 1.5; marker-end: url(#arw); }
+    .en   { fill: none; stroke: #818b98; stroke-width: 1.5; }
+    .ed   { stroke-dasharray: 5 4; }
+    .err  { stroke: #cf222e; marker-end: url(#arw-err); }
+    .errt { fill: #cf222e; }
+  </style>
+  <defs>
+    <marker id="arw" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="9" markerHeight="9"
+            markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#818b98"/>
+    </marker>
+    <marker id="arw-err" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="9" markerHeight="9"
+            markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#cf222e"/>
+    </marker>
+  </defs>
+  <rect width="1020" height="740" fill="#ffffff"/>
+  <path class="en ed" d="M120,76 V704"/>
+  <rect class="c" x="45" y="24" width="150" height="52" rx="10"/>
+  <text x="120" y="48" class="ttl" text-anchor="middle">Extractor</text>
+  <text x="120" y="65" class="code" text-anchor="middle">quickbooks/extractor.js</text>
+  <path class="en ed" d="M390,76 V704"/>
+  <rect class="c" x="275" y="24" width="230" height="52" rx="10"/>
+  <text x="390" y="48" class="ttlm" text-anchor="middle">makeQuickBooksApiCall</text>
+  <text x="390" y="65" class="code" text-anchor="middle">quickbooks/client.js</text>
+  <path class="en ed" d="M660,76 V704"/>
+  <rect class="c" x="550" y="24" width="220" height="52" rx="10"/>
+  <text x="660" y="48" class="ttlm" text-anchor="middle">quickbooks_oauth_token</text>
+  <text x="660" y="65" class="code" text-anchor="middle">PostgreSQL</text>
+  <path class="en ed" d="M905,76 V704"/>
+  <rect class="c" x="830" y="24" width="150" height="52" rx="10"/>
+  <text x="905" y="48" class="ttl" text-anchor="middle">Intuit API</text>
+  <text x="905" y="65" class="code" text-anchor="middle">OAuth + Accounting</text>
+  <path class="e" d="M120,112 H390"/>
+  <text x="255" y="105" class="lbl" text-anchor="middle">request P&amp;L report</text>
+  <path class="e" d="M390,146 H660"/>
+  <text x="525" y="139" class="lbl" text-anchor="middle">load token row</text>
+  <path class="e ed" d="M660,178 H390"/>
+  <text x="525" y="171" class="lbl" text-anchor="middle">token row or null</text>
+  <rect class="p" x="30" y="200" width="490" height="58" rx="6" fill="none"/>
+  <path class="p" d="M30,206 a6,6 0 0,1 6,-6 H203.29999999999998 l0,18 H36 a6,6 0 0,1 -6,-6 Z"/>
+  <text x="39" y="213" class="gut" text-anchor="start">OPT · NO STORED TOKEN</text>
+  <path class="e ed err" d="M390,242 H120"/>
+  <text x="255" y="235" class="lbl errt" text-anchor="middle">throw QB_RECONNECT_REQUIRED</text>
+  <rect class="p" x="265" y="276" width="250" height="34" rx="10"/>
+  <text x="390" y="297" class="sub" text-anchor="middle">refresh when within 60 s of expires_at</text>
+  <rect class="p" x="260" y="322" width="730" height="112" rx="6" fill="none"/>
+  <path class="p" d="M260,328 a6,6 0 0,1 6,-6 H426 l0,18 H266 a6,6 0 0,1 -6,-6 Z"/>
+  <text x="269" y="335" class="gut" text-anchor="start">OPT · REFRESH NEEDED</text>
+  <path class="e" d="M390,356 H905"/>
+  <text x="647.5" y="349" class="lbl" text-anchor="middle">oauthClient.refresh()</text>
+  <path class="e ed" d="M905,388 H390"/>
+  <text x="647.5" y="381" class="lbl" text-anchor="middle">rotated access + refresh token</text>
+  <path class="e" d="M390,420 H660"/>
+  <text x="525" y="413" class="lbl" text-anchor="middle">upsert rotated token</text>
+  <path class="e" d="M390,466 H905"/>
+  <text x="647.5" y="459" class="lbl" text-anchor="middle">makeApiCall(options)</text>
+  <rect class="p" x="30" y="488" width="960" height="216" rx="6" fill="none"/>
+  <path class="p" d="M30,494 a6,6 0 0,1 6,-6 H144.89999999999998 l0,18 H36 a6,6 0 0,1 -6,-6 Z"/>
+  <text x="39" y="501" class="gut" text-anchor="start">ALT · SUCCESS</text>
+  <path class="e ed" d="M905,522 H390"/>
+  <text x="647.5" y="515" class="lbl" text-anchor="middle">report JSON + intuit_tid header</text>
+  <path class="e ed" d="M390,550 H120"/>
+  <text x="255" y="543" class="lbl" text-anchor="middle">response</text>
+  <path class="en ed" d="M30,566 H990"/>
+  <text x="39" y="580" class="gut" text-anchor="start">[ invalid_grant ]</text>
+  <path class="e" d="M390,594 H660"/>
+  <text x="525" y="587" class="lbl" text-anchor="middle">delete token row</text>
+  <path class="e ed err" d="M390,622 H120"/>
+  <text x="255" y="615" class="lbl errt" text-anchor="middle">throw QB_RECONNECT_REQUIRED</text>
+  <path class="en ed" d="M30,634 H990"/>
+  <text x="39" y="648" class="gut" text-anchor="start">[ transient error ]</text>
+  <path class="e" d="M390,662 H905"/>
+  <text x="647.5" y="655" class="lbl" text-anchor="middle">refreshIfNeeded, then retry once</text>
+  <path class="e ed" d="M905,690 H390"/>
+  <text x="647.5" y="683" class="lbl" text-anchor="middle">response</text>
+</svg>
