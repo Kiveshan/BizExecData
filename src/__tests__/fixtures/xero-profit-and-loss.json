@@ -1,0 +1,195 @@
+{
+  "reports": [
+    {
+      "reportID": "ProfitAndLoss",
+      "reportName": "Profit and Loss",
+      "reportType": "ProfitAndLoss",
+      "reportTitles": [
+        "Profit and Loss",
+        "Demo Company (Global)",
+        "1 March 2026 to 31 March 2026"
+      ],
+      "reportDate": "31 March 2026",
+      "updatedDateUTC": "/Date(1774915200000)/",
+      "fields": [],
+      "rows": [
+        {
+          "rowType": "Header",
+          "cells": [{ "value": "" }, { "value": "31 Mar 26" }]
+        },
+        {
+          "rowType": "Section",
+          "title": "Income",
+          "rows": [
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Sales",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000001", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "128450.00",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000001", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Consulting Income",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000002", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "41200.50",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000002", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "SummaryRow",
+              "cells": [{ "value": "Total Income" }, { "value": "169650.50" }]
+            }
+          ]
+        },
+        {
+          "rowType": "Section",
+          "title": "Less Cost of Sales",
+          "rows": [
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Purchases",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000010", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "52300.00",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000010", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Freight & Courier",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000011", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "3180.25",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000011", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "SummaryRow",
+              "cells": [{ "value": "Total Cost of Sales" }, { "value": "55480.25" }]
+            }
+          ]
+        },
+        {
+          "rowType": "Section",
+          "title": "",
+          "rows": [
+            {
+              "rowType": "Row",
+              "cells": [{ "value": "Gross Profit" }, { "value": "114170.25" }]
+            }
+          ]
+        },
+        {
+          "rowType": "Section",
+          "title": "Less Operating Expenses",
+          "rows": [
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Advertising",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000020", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "2400.00",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000020", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Rent",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000021", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "18000.00",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000021", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "Row",
+              "cells": [
+                {
+                  "value": "Wages and Salaries",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000022", "id": "account" }
+                  ]
+                },
+                {
+                  "value": "61500.00",
+                  "attributes": [
+                    { "value": "3f2b1a44-0000-4000-8000-000000000022", "id": "account" }
+                  ]
+                }
+              ]
+            },
+            {
+              "rowType": "SummaryRow",
+              "cells": [
+                { "value": "Total Operating Expenses" },
+                { "value": "81900.00" }
+              ]
+            }
+          ]
+        },
+        {
+          "rowType": "Section",
+          "title": "",
+          "rows": [
+            {
+              "rowType": "Row",
+              "cells": [{ "value": "Net Profit" }, { "value": "32270.25" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

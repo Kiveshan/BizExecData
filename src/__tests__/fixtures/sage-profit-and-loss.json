@@ -1,0 +1,98 @@
+{
+  "fromDate": "2026-03-01",
+  "toDate": "2026-03-31",
+  "data": [
+    {
+      "Description": "Sales",
+      "ReportingLevelType": 0,
+      "Total": [169650.5],
+      "Children": [
+        {
+          "Description": "Sales - Services",
+          "ReportingLevelType": 1,
+          "Total": [128450.0],
+          "Children": []
+        },
+        {
+          "Description": "Sales - Consulting",
+          "ReportingLevelType": 1,
+          "Total": [41200.5],
+          "Children": []
+        }
+      ]
+    },
+    {
+      "Description": "Total for Sales",
+      "ReportingLevelType": 10,
+      "Total": [169650.5],
+      "Children": []
+    },
+    {
+      "Description": "Cost of Sales",
+      "ReportingLevelType": 0,
+      "Total": [55480.25],
+      "Children": [
+        {
+          "Description": "Purchases",
+          "ReportingLevelType": 1,
+          "Total": [52300.0],
+          "Children": []
+        },
+        {
+          "Description": "Freight and Courier",
+          "ReportingLevelType": 1,
+          "Children": []
+        }
+      ]
+    },
+    {
+      "Description": "Total for Cost of Sales",
+      "ReportingLevelType": 10,
+      "Total": [55480.25],
+      "Children": []
+    },
+    {
+      "Description": "Gross Profit",
+      "ReportingLevelType": 10,
+      "Total": [114170.25],
+      "Children": []
+    },
+    {
+      "Description": "Expenses",
+      "ReportingLevelType": 0,
+      "Total": [81900.0],
+      "Children": [
+        {
+          "Description": "Advertising",
+          "ReportingLevelType": 1,
+          "Total": [2400.0],
+          "Children": []
+        },
+        {
+          "Description": "Rent Paid",
+          "ReportingLevelType": 1,
+          "Total": [18000.0],
+          "Children": []
+        },
+        {
+          "Description": "Salaries and Wages",
+          "ReportingLevelType": 1,
+          "Total": [61500.0],
+          "Children": []
+        }
+      ]
+    },
+    {
+      "Description": "Total for Expenses",
+      "ReportingLevelType": 10,
+      "Total": [81900.0],
+      "Children": []
+    },
+    {
+      "Description": "Net Profit Or Loss After Tax",
+      "ReportingLevelType": 10,
+      "Total": [32270.25],
+      "Children": []
+    }
+  ]
+}

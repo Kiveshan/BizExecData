@@ -295,18 +295,77 @@ export async function processMonthlyData(
   }
 }
 
+// ─── Pure normalisers ─────────────────────────────────────────────────────────
+//
+// Sage returns the P&L as a tree of reporting groups. These turn one report
+// into flat { name, amount } rows / totals. They are kept free of database
+// access so they can be exercised directly against recorded fixtures.
+
+/** Line items under the "Sales" reporting group. */
+export function extractSageRevenue(profitandlossdata) {
+  const revenue = jsonpath.query(
+    profitandlossdata.data,
+    '$[?(@.Description=="Sales")].Children[*]'
+  );
+  return revenue.map((item) => ({
+    name: item.Description,
+    amount: item.Total[0],
+  }));
+}
+
+/** Line items under the "Expenses" reporting group. */
+export function extractSageExpenses(profitandlossdata) {
+  const expenses = jsonpath.query(
+    profitandlossdata.data,
+    '$[?(@.Description=="Expenses")].Children[*]'
+  );
+  return expenses.map((item) => ({
+    name: item.Description,
+    amount: item.Total[0],
+  }));
+}
+
+/** Line items under the "Cost of Sales" reporting group. */
+export function extractSageCostOfSales(profitandlossdata) {
+  const costOfSales = jsonpath.query(
+    profitandlossdata.data,
+    '$[?(@.Description=="Cost of Sales")].Children[*]'
+  );
+  return costOfSales.map((item) => ({
+    name: item.Description,
+    amount: item.Total ? item.Total[0] : 0,
+  }));
+}
+
+/**
+ * The report-level totals (ReportingLevelType 10). Any total Sage omits
+ * falls back to 0 so a partial report still yields a usable row.
+ */
+export function extractSageTotals(profitandlossdata) {
+  const totals = jsonpath.query(
+    profitandlossdata.data,
+    "$[?(@.ReportingLevelType==10)]"
+  );
+
+  const pick = (description) =>
+    totals.find((item) => item.Description === description)?.Total?.[0] || 0;
+
+  return {
+    grossProfit: pick("Gross Profit"),
+    netProfit: pick("Net Profit Or Loss After Tax"),
+    totalSales: pick("Total for Sales"),
+    totalCostOfSales: pick("Total for Cost of Sales"),
+    totalExpenses: pick("Total for Expenses"),
+  };
+}
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+
 async function getSageRevenue(profitandlossdata, userid, customDate = null) {
   const prisma = getPrismaClient();
   try {
     const date = customDate || new Date();
-    const revenue = jsonpath.query(
-      profitandlossdata.data,
-      '$[?(@.Description=="Sales")].Children[*]'
-    );
-    const salesExtracted = revenue.map((item) => ({
-      name: item.Description,
-      amount: item.Total[0],
-    }));
+    const salesExtracted = extractSageRevenue(profitandlossdata);
 
     for (const revenue of salesExtracted) {
       const existingRecord = await prisma.sage_revenue.findFirst({
@@ -343,14 +402,7 @@ async function insertSageExpenses(profitandlossdata, userid, customDate = null) 
   const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
-    const expenses = jsonpath.query(
-      profitandlossdata.data,
-      '$[?(@.Description=="Expenses")].Children[*]'
-    );
-    const expensesExtracted = expenses.map((item) => ({
-      name: item.Description,
-      amount: item.Total[0],
-    }));
+    const expensesExtracted = extractSageExpenses(profitandlossdata);
 
     for (const expense of expensesExtracted) {
       const existingRecord = await prisma.sage_expenses.findFirst({
@@ -387,14 +439,7 @@ async function insertSageCostOfSales(profitandlossdata, userid, customDate = nul
   const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
-    const costOfSales = jsonpath.query(
-      profitandlossdata.data,
-      '$[?(@.Description=="Cost of Sales")].Children[*]'
-    );
-    const costOfSalesExtracted = costOfSales.map((item) => ({
-      name: item.Description,
-      amount: item.Total ? item.Total[0] : 0,
-    }));
+    const costOfSalesExtracted = extractSageCostOfSales(profitandlossdata);
 
     for (const item of costOfSalesExtracted) {
       const existingRecord = await prisma.sage_costofsales.findFirst({
@@ -431,25 +476,13 @@ async function insertSageTotals(profitandlossdata, userid, customDate = null) {
   const prisma = getPrismaClient();
   try {
     const formattedDate = customDate || new Date();
-    const totals = jsonpath.query(
-      profitandlossdata.data,
-      "$[?(@.ReportingLevelType==10)]"
-    );
-
-    const grossProfit =
-      totals.find((item) => item.Description === "Gross Profit")?.Total?.[0] || 0;
-    const netProfit =
-      totals.find((item) => item.Description === "Net Profit Or Loss After Tax")
-        ?.Total?.[0] || 0;
-    const totalSales =
-      totals.find((item) => item.Description === "Total for Sales")
-        ?.Total?.[0] || 0;
-    const totalCostOfSales =
-      totals.find((item) => item.Description === "Total for Cost of Sales")
-        ?.Total?.[0] || 0;
-    const totalExpenses =
-      totals.find((item) => item.Description === "Total for Expenses")
-        ?.Total?.[0] || 0;
+    const {
+      grossProfit,
+      netProfit,
+      totalSales,
+      totalCostOfSales,
+      totalExpenses,
+    } = extractSageTotals(profitandlossdata);
 
     const existingRecord = await prisma.sage_company_calcs.findFirst({
       where: { userid, date: formattedDate },

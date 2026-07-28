@@ -152,7 +152,7 @@ export function extractDateFromExcel(buffer) {
  * Col F is preferred over col E so formula-computed totals are captured
  * correctly regardless of whether the file was saved with cached values.
  */
-function parseIncomeStatementRows(sheet) {
+export function parseIncomeStatementRows(sheet) {
   const rows = [];
 
   const ref = sheet["!ref"];
@@ -168,15 +168,6 @@ function parseIncomeStatementRows(sheet) {
     const label = labelCell.v.trim();
     if (!label) continue;
 
-    // Check if this row is a category header (uppercase, no amount columns)
-    if (CATEGORY_HEADERS.has(label.toUpperCase())) {
-      currentCategory = label.toUpperCase();
-      continue;
-    }
-
-    // No category seen yet — skip until we hit the first header
-    if (!currentCategory) continue;
-
     const colECell = sheet[xlsx.utils.encode_cell({ r, c: 4 })]; // col E
     const colFCell = sheet[xlsx.utils.encode_cell({ r, c: 5 })]; // col F
 
@@ -184,6 +175,18 @@ function parseIncomeStatementRows(sheet) {
     const colEValue = colECell && typeof colECell.v === "number" ? colECell.v : null;
 
     const amount = colFValue ?? colEValue;
+
+    // A category header carries no amount. Matching on the label alone is not
+    // enough: the COGS total row is labelled "Cost of goods sold", which
+    // upper-cases to its own section header and would be swallowed as one,
+    // dropping the total the company dashboard reads for cost of sales.
+    if (amount === null && CATEGORY_HEADERS.has(label.toUpperCase())) {
+      currentCategory = label.toUpperCase();
+      continue;
+    }
+
+    // No category seen yet — skip until we hit the first header
+    if (!currentCategory) continue;
     if (amount === null) continue;
 
     const normalizedSubcategory = normalizeSubcategory(label);

@@ -1,0 +1,156 @@
+{
+  "Header": {
+    "Time": "2026-04-01T09:14:22-07:00",
+    "ReportName": "ProfitAndLoss",
+    "ReportBasis": "Accrual",
+    "StartPeriod": "2026-03-01",
+    "EndPeriod": "2026-03-31",
+    "SummarizeColumnsBy": "Total",
+    "Currency": "USD"
+  },
+  "Columns": {
+    "Column": [
+      { "ColTitle": "", "ColType": "Account" },
+      { "ColTitle": "Total", "ColType": "Money" }
+    ]
+  },
+  "Rows": {
+    "Row": [
+      {
+        "Header": { "ColData": [{ "value": "Income" }, { "value": "" }] },
+        "Rows": {
+          "Row": [
+            {
+              "ColData": [
+                { "value": "Design income", "id": "82" },
+                { "value": "2250.00" }
+              ],
+              "type": "Data"
+            },
+            {
+              "ColData": [
+                { "value": "Landscaping Services", "id": "45" },
+                { "value": "1477.50" }
+              ],
+              "type": "Data"
+            },
+            {
+              "ColData": [
+                { "value": "Sales of Product Income", "id": "79" },
+                { "value": "912.75" }
+              ],
+              "type": "Data"
+            }
+          ]
+        },
+        "Summary": {
+          "ColData": [{ "value": "Total Income" }, { "value": "4640.25" }]
+        },
+        "type": "Section",
+        "group": "Income"
+      },
+      {
+        "Header": {
+          "ColData": [{ "value": "Cost of Goods Sold" }, { "value": "" }]
+        },
+        "Rows": {
+          "Row": [
+            {
+              "ColData": [
+                { "value": "Cost of Goods Sold", "id": "80" },
+                { "value": "405.00" }
+              ],
+              "type": "Data"
+            },
+            {
+              "ColData": [
+                { "value": "Supplies & Materials - COGS", "id": "81" },
+                { "value": "310.50" }
+              ],
+              "type": "Data"
+            }
+          ]
+        },
+        "Summary": {
+          "ColData": [
+            { "value": "Total Cost of Goods Sold" },
+            { "value": "715.50" }
+          ]
+        },
+        "type": "Section",
+        "group": "COGS"
+      },
+      {
+        "Header": { "ColData": [{ "value": "Expenses" }, { "value": "" }] },
+        "Rows": {
+          "Row": [
+            {
+              "ColData": [
+                { "value": "Advertising", "id": "7" },
+                { "value": "74.86" }
+              ],
+              "type": "Data"
+            },
+            {
+              "ColData": [
+                { "value": "Automobile", "id": "55" },
+                { "value": "113.96" }
+              ],
+              "type": "Data"
+            },
+            {
+              "Header": {
+                "ColData": [
+                  { "value": "Job Expenses", "id": "12" },
+                  { "value": "" }
+                ]
+              },
+              "Rows": {
+                "Row": [
+                  {
+                    "ColData": [
+                      { "value": "Job Materials", "id": "64" },
+                      { "value": "112.50" }
+                    ],
+                    "type": "Data"
+                  }
+                ]
+              },
+              "Summary": {
+                "ColData": [
+                  { "value": "Total Job Expenses" },
+                  { "value": "112.50" }
+                ]
+              },
+              "type": "Section"
+            }
+          ]
+        },
+        "Summary": {
+          "ColData": [{ "value": "Total Expenses" }, { "value": "301.32" }]
+        },
+        "type": "Section",
+        "group": "Expenses"
+      },
+      {
+        "Header": { "ColData": [{ "value": "Other Income" }, { "value": "" }] },
+        "Rows": {
+          "Row": [
+            {
+              "ColData": [
+                { "value": "Interest Earned", "id": "88" },
+                { "value": "42.10" }
+              ],
+              "type": "Data"
+            }
+          ]
+        },
+        "Summary": {
+          "ColData": [{ "value": "Total Other Income" }, { "value": "42.10" }]
+        },
+        "type": "Section",
+        "group": "OtherIncome"
+      }
+    ]
+  }
+}

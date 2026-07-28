@@ -1,5 +1,5 @@
 import { getPrismaClient } from "../../config/prismaClient.js";
-import { xero } from "./client.js";
+import { createXeroClientFromTokenSet } from "./client.js";
 import jsonpath from "jsonpath";
 import { createModuleLogger } from "../../utils/logger.js";
 
@@ -105,7 +105,14 @@ function toDbDate(value) {
   return parsed;
 }
 
-export async function processXeroData(userid) {
+/**
+ * Runs a full extraction for one user.
+ *
+ * The caller supplies the connection (`tokenSet`, `tenantId`) captured from
+ * that user's session. Reading them off a shared client instead would let a
+ * second user connecting mid-run redirect this extraction at their tenant.
+ */
+export async function processXeroData(userid, { tokenSet, tenantId } = {}) {
   const prisma = getPrismaClient();
   try {
     const user = await prisma.user_table.findUnique({
@@ -116,11 +123,11 @@ export async function processXeroData(userid) {
     const isInitialExtraction = user?.first_time_insertion ?? true;
     moduleLogger.info({ userid, isInitialExtraction }, "Starting Xero extraction");
 
-    if (!xero.tenants || xero.tenants.length === 0) {
-      throw new Error("No tenants available. Please connect to Xero first.");
+    if (!tokenSet || !tenantId) {
+      throw new Error("No Xero connection supplied. Please connect to Xero first.");
     }
 
-    const tenantId = xero.tenants[0].tenantId;
+    const xero = createXeroClientFromTokenSet(tokenSet);
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
