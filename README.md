@@ -8,7 +8,7 @@ A server-rendered Node/Express application that lets a business connect one acco
 
 Each source has a different authentication model and a structurally different report API. The core of the system is therefore an extraction layer that normalises four dissimilar shapes into a common `{category, amount, date}` row plus a monthly `{grossprofit, opexpenses, netprofit, sumofsales, sumofcost}` calc, then renders per-provider dashboards from those rows.
 
-**Contents** — [Architecture](#architecture) · [End-to-end flow](#end-to-end-flow) · [Tech stack](#tech-stack) · [Technical decisions](#technical-decisions) · [Running locally](#running-locally) · [Project structure](#project-structure) · [Limitations](#limitations-and-things-id-change)
+**Contents** — [Architecture](#architecture) · [End-to-end flow](#end-to-end-flow) · [Tech stack](#tech-stack) · [Technical decisions](#technical-decisions) · [Running locally](#running-locally) · [Project structure](#project-structure) · [Issues found and fixed](#issues-found-and-fixed) · [Limitations](#limitations-and-things-id-change)
 
 ## Architecture
 
@@ -53,7 +53,7 @@ What actually happens from a cold start, including the parts that will block you
 | Chart.js + D3 | Client-side charts on the dashboards. |
 | EJS | Server-rendered views and partials per provider. |
 | Pino | Structured, per-module logging. |
-| Jest + Supertest | Tests for the app boot path and auth middleware. |
+| Jest + Supertest | Tests for the app boot path, auth middleware, and the four P&L normalisers against recorded fixtures. |
 
 Intuit's App Store security requirements and how they are met are documented separately in [SECURITY_COMPLIANCE.md](SECURITY_COMPLIANCE.md).
 
@@ -81,7 +81,7 @@ Two details worth calling out:
 - **Forced reconnect on a dead refresh token.** `invalid_grant` — whether it surfaces during refresh or during the call itself — clears the stored token and raises `QB_RECONNECT_REQUIRED`, which routes turn into a redirect to `/quickbooks/auth?error=reconnect_required` rather than a 500.
 - **`intuit_tid` capture.** Every call logs Intuit's transaction ID from the response headers, on both the success and error paths and across three possible header locations. It is the first thing Intuit asks for when raising a support case.
 
-The authorize step also generates `crypto.randomBytes(24)` as an OAuth `state`, stores it on the session, and rejects a mismatched callback with a 403 before exchanging the code.
+Both OAuth providers generate `crypto.randomBytes(24)` as a `state` at the authorize step, persist it on the session before redirecting, and reject a mismatched callback with a 403 before exchanging the code. The Xero side is worth a note: `xero-node` *looks* like it validates state for you — `apiCallback` passes `{ state: this.config.state }` to `openid-client` as a check — but when `config.state` is unset, no state is sent on the consent URL, none comes back, and the check passes vacuously. Setting it per request is what makes that check real.
 
 ### 2. Normalising three structurally different report APIs
 
@@ -161,6 +161,10 @@ npm run lint
 npm run lint:fix
 ```
 
+55 tests across 6 suites. Beyond the app boot path and auth middleware, the bulk of it covers the four P&L normalisers against **recorded fixtures** — one captured response shape per provider ([src/\_\_tests\_\_/fixtures/](src/__tests__/fixtures/)), plus the committed `uploads/IS1.xlsx` template standing in as its own fixture for the Excel path.
+
+The normaliser tests are the ones that earn their keep: each provider returns a structurally different report, and these pin down exactly which rows are picked up, which are deliberately skipped, and what happens when a section or total is missing. Where a report carries both line items and its own totals, the tests assert the line items **reconcile** against the total rather than just matching a hardcoded number — which is what caught the Excel cost-of-goods bug described under [Issues found and fixed](#issues-found-and-fixed).
+
 [`.github/workflows/deploy-prod.yaml`](.github/workflows/deploy-prod.yaml) runs migrations, ESLint and the test suite on every push to `main`, then packages the app and deploys it to AWS Elastic Beanstalk (`af-south-1`). There is no staging workflow.
 
 ## Project structure
@@ -169,7 +173,6 @@ npm run lint:fix
 BizExecData/
 ├── server.js                  # Entry point: mounts route modules, static assets, error handlers, listen()
 ├── prisma.config.ts           # Prisma config
-├── passport-config.js         # Legacy — superseded by src/config/passport.js (see Limitations)
 ├── SECURITY_COMPLIANCE.md     # How the app meets Intuit's App Store security requirements
 ├── prisma/
 │   ├── schema.prisma          # 17 models: user_table, roles, per-provider calc/line tables, oauth token
@@ -179,7 +182,7 @@ BizExecData/
 │   └── *.svg                  # Generated — edit the script, not these
 ├── src/
 │   ├── app.js                 # Express app: helmet, CORS, sessions, passport, rate limiter, file upload
-│   ├── config/                # env, prismaClient (pg pool + adapter), passport, security, legacy database.js
+│   ├── config/                # env, prismaClient (pg pool + adapter), passport, security
 │   ├── middleware/            # auth guards, admin guard, session factory, error handler
 │   ├── modules/               # Feature modules, each with routes + controller/extractor/client
 │   │   ├── auth/              #   local login/register
@@ -191,24 +194,36 @@ BizExecData/
 │   │   └── excel/             #   workbook/txt parsing, upload + amend flows
 │   ├── utils/                 # crypto (AES), file/date helpers, logger, validation
 │   ├── generated/prisma/      # Generated Prisma client — gitignored
-│   └── __tests__/             # Jest: app boot path, auth middleware
+│   └── __tests__/             # Jest: boot path, auth middleware, P&L normalisers
+│       ├── fixtures/          #   recorded provider report shapes
+│       └── modules/           #   xero/quickbooks/sage/excel normaliser tests
 ├── views/                     # EJS templates
 │   ├── layouts/               #   page layout
 │   ├── pages/                 #   per-provider head/body fragments
 │   └── partials/              #   navbars, sidebars, footer (per provider)
 ├── public/                    # Static assets, styles, and _legacy_html/ (pre-EJS pages, unused)
-├── uploads/                   # Excel income-statement templates (IS.xltx, IS1.xlsx)
+├── uploads/                   # Excel income-statement templates (IS1.xlsx doubles as a test fixture)
 └── .github/workflows/         # Elastic Beanstalk deploy (prod, on push to main)
 ```
 
+## Issues found and fixed
+
+A self-review of this codebase turned up four defects worth writing up, three of them security or correctness bugs that were live in the deployed app.
+
+- **Xero's OAuth callback accepted any `state` (CSRF).** QuickBooks generated and verified a `state`; Xero did neither, so its callback would exchange an attacker-supplied authorization code and bind the victim's session to the attacker's Xero org. The subtlety is that `xero-node` appears to cover this — `apiCallback` hands `{ state: this.config.state }` to `openid-client` — but with `config.state` undefined, no state is ever sent, nothing comes back, and the check silently passes. **Fixed** in [xero/routes.js](src/modules/xero/routes.js): a `crypto.randomBytes(24)` state is stored on the session and saved before the redirect, compared on callback, and set on the client so the SDK's own check has something to verify.
+
+- **Provider clients were module-level singletons (cross-tenant data leak).** `XeroClient` and `intuit-oauth`'s `OAuthClient` both hold the active token — and Xero also holds the resolved tenant list — as mutable state on the instance. With one shared instance, a second user connecting mid-extraction overwrote `xero.tenants`, and the still-running background job would read the *new* tenant's P&L and write it under the *first* user's `userid`. **Fixed** by making both clients per-request factories ([xero/client.js](src/modules/xero/client.js), [quickbooks/client.js](src/modules/quickbooks/client.js)); `processXeroData` now receives the token set and tenant id captured from the session that started it, rather than reading shared state.
+
+- **The Excel COGS total never reached the database.** `parseIncomeStatementRows` treated any label matching a known section header as a header — but the cost-of-goods total row is labelled `Cost of goods sold`, which upper-cases to its own section header `COST OF GOODS SOLD`. The total was swallowed as a header and dropped, so `getExcelCompanyData` — which reads exactly that subcategory — reported cost of sales as `R0.00` for every uploaded workbook. **Fixed** in [excel/controller.js](src/modules/excel/controller.js) by applying the convention the parser already documented: a header is a known label *with no amount on the row*. Found by writing the fixture test below, not by reading the code.
+
+- **Dead code carrying a hardcoded password.** `src/config/database.js` was unused but still shipped a `"123456"` fallback DB password behind `RDS_*` variables, and root `passport-config.js` — its only consumer — duplicated `src/config/passport.js`. **Both deleted.**
+
 ## Limitations and things I'd change
 
-- **Provider clients are module-level singletons.** The `xero` and `intuit-oauth` clients hold mutable token/tenant state on a shared instance, so concurrent extraction for multiple users could interleave. A per-request or per-user client instance would be the correct fix.
-- **OAuth `state` is verified for QuickBooks but not for Xero.** The Xero callback should validate a stored `state` the same way the QuickBooks callback does.
-- **Dead code still ships.** `src/config/database.js` is unused but still carries a hardcoded fallback password (`"123456"`) behind `RDS_*` variables, and the root `passport-config.js` duplicates `src/config/passport.js`. Both should be deleted.
-- **`uploads/` is gitignored but its templates are tracked.** `IS.xltx` and `IS1.xlsx` were committed before the ignore rule was added, so they survive by accident; a new template dropped in that folder would be silently untracked.
+- **`uploads/` is gitignored but its templates are tracked.** `IS.xltx` and `IS1.xlsx` were committed before the ignore rule was added, so they survive by accident; a new template dropped in that folder would be silently untracked. Both are the stock OfficeReady income-statement template with placeholder figures — no client data — and `IS1.xlsx` now doubles as a test fixture, so they are worth keeping deliberately rather than by accident.
 - **Several admin endpoints are disabled.** `getAdminDashboard`, `getApprovedUsers` and `previewUser` return `410 Gone` ("not available on this deployment"), so the admin surface is narrower than the routes suggest.
-- **Test coverage is thin** — currently the app boot path and auth middleware. The extractors and normalisers are the highest-value targets for unit tests against recorded report fixtures.
+- **Test coverage stops at the normalisers.** The four P&L normalisers are covered against recorded fixtures (below), but the route handlers, token-refresh paths and Prisma upserts are not. Those need either a test database or a mocked Prisma client; the recursive `findFinancialData` walker is covered, its four `upsert*` callees are not.
+- **Sage line items throw on a missing `Total`, cost-of-sales defaults to 0.** `extractSageRevenue`/`extractSageExpenses` read `item.Total[0]` directly while `extractSageCostOfSales` guards with `item.Total ? ... : 0`. A Sales group with no movement therefore aborts the whole month rather than recording zero. The asymmetry is pinned by tests; it predates this pass and is left as-is pending a decision on which behaviour is correct.
 - **Provider data lives in parallel tables.** A single table with a `source` discriminator would remove the duplicated `xero_*`/`sage_*`/base schema and simplify cross-source comparison, at the cost of mixing provider quirks in one place.
 - **Sage uses Basic auth with credentials in the session.** This is a constraint of the API surface used here; an OAuth-based Sage integration would avoid handling the user's password at all.
 

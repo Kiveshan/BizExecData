@@ -1,6 +1,7 @@
 import { Router } from "express";
 import jsonpath from "jsonpath";
-import { xero } from "./client.js";
+import crypto from "crypto";
+import { createXeroClient } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import { checkAuthenticated } from "../../middleware/auth.js";
 import {
@@ -19,9 +20,23 @@ router.get("/xero-connect", async (req, res) => {
   try {
     xeroRouteLogger.debug("Initiating Xero OAuth flow");
     delete req.session.tokenSet;
+
+    const state = crypto.randomBytes(24).toString("hex");
+    req.session.xero_oauth_state = state;
+
+    const xero = createXeroClient({ state });
     const consentUrl = await xero.buildConsentUrl();
     xeroRouteLogger.debug({ consentUrl }, "Xero consent URL generated");
-    res.redirect(consentUrl);
+
+    // Persist the state before redirecting so the callback can never race the
+    // session store write.
+    req.session.save((err) => {
+      if (err) {
+        xeroRouteLogger.error({ err }, "Failed to save OAuth state before redirect");
+        return res.status(500).send("Session error");
+      }
+      res.redirect(consentUrl);
+    });
   } catch (err) {
     xeroRouteLogger.error({ err }, "Error during Xero connect");
     res.send("Sorry, something went wrong");
@@ -32,6 +47,19 @@ router.get("/auth/xero/callback", async (req, res) => {
   const prisma = getPrismaClient();
   xeroRouteLogger.info("Xero OAuth callback received");
   try {
+    const expectedState = req.session.xero_oauth_state;
+    const providedState = req.query?.state;
+    req.session.xero_oauth_state = null;
+    if (!expectedState || !providedState || expectedState !== providedState) {
+      xeroRouteLogger.warn(
+        { expectedStatePresent: Boolean(expectedState), providedState },
+        "Xero OAuth state mismatch"
+      );
+      return res.status(403).send("Invalid OAuth state");
+    }
+
+    // Same state on the client so xero-node re-checks it during the exchange.
+    const xero = createXeroClient({ state: expectedState });
     const tokenSet = await xero.apiCallback(req.url);
     await xero.updateTenants();
     xeroRouteLogger.debug("Xero tokens and tenants updated");
@@ -185,9 +213,20 @@ router.post("/start-xero-extraction", async (req, res) => {
     }
 
     const userid = req.session.userid;
+    const tokenSet = req.session.tokenSet;
+    const tenantId = req.session.activeTenant?.tenantId;
+
+    if (!tokenSet || !tenantId) {
+      xeroRouteLogger.warn({ userid }, "Xero extraction attempted without an active connection");
+      return res.status(400).json({
+        success: false,
+        error: "Not connected to Xero. Please reconnect.",
+      });
+    }
+
     xeroRouteLogger.info({ userid }, "Starting Xero data extraction");
     extractionStatus.xero[userid] = false;
-    processXeroData(userid);
+    processXeroData(userid, { tokenSet, tenantId });
 
     res.json({
       success: true,

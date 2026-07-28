@@ -3,9 +3,8 @@ import jsonpath from "jsonpath";
 import OAuthClient from "intuit-oauth";
 import crypto from "crypto";
 import {
-  oauthClient,
+  createOAuthClient,
   authurl,
-  setOAuthToken,
   getQuickBooksApiBaseUrl,
   getQuickBooksRealmId,
   makeQuickBooksApiCall,
@@ -45,12 +44,21 @@ router.get("/auth", (req, res) => {
   
   const state = crypto.randomBytes(24).toString("hex");
   req.session.qb_oauth_state = state;
-  const authUri = oauthClient.authorizeUri({
+  const authUri = createOAuthClient().authorizeUri({
     scope: [OAuthClient.scopes.Accounting],
     state,
   });
   qbRouteLogger.debug({ authUri }, "QuickBooks auth URI generated");
-  res.redirect(authUri);
+
+  // Persist the state before redirecting so the callback can never race the
+  // session store write.
+  req.session.save((err) => {
+    if (err) {
+      qbRouteLogger.error({ err }, "Failed to save OAuth state before redirect");
+      return res.status(500).send("Session error");
+    }
+    res.redirect(authUri);
+  });
 });
 
 router.get(authurl, async (req, res) => {
@@ -64,8 +72,8 @@ router.get(authurl, async (req, res) => {
       return res.status(403).send("Invalid OAuth state");
     }
 
+    const oauthClient = createOAuthClient();
     const tokenResponse = await oauthClient.createToken(req.url);
-    setOAuthToken(JSON.stringify(tokenResponse.json, null, 2));
     const companyID = oauthClient.getToken().realmId;
     const companyIdBigInt = (() => {
       try {

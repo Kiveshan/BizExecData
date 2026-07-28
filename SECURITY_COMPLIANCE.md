@@ -78,7 +78,7 @@ app.use((req, res, next) => {
 #### Cross Site Request Forgery (CSRF)
 **Implementation**:
 - OAuth state parameter validation prevents CSRF
-- Session-based state tokens for QuickBooks OAuth
+- Session-based state tokens for both QuickBooks and Xero OAuth, generated with `crypto.randomBytes(24)`, persisted before redirect and compared on callback (mismatch returns 403 before the code is exchanged)
 - SameSite cookie settings
 
 #### Cross Site Scripting (XSS)

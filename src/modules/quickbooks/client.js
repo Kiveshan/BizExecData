@@ -2,12 +2,21 @@ import OAuthClient from "intuit-oauth";
 import { getPrismaClient } from "../../config/prismaClient.js";
 import { createModuleLogger } from "../../utils/logger.js";
 
-export const oauthClient = new OAuthClient({
-  clientId: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-  environment: process.env.QB_ENVIRONMENT || "sandbox",
-  redirectUri: process.env.REDIRECT_URI,
-});
+/**
+ * Builds a fresh OAuthClient.
+ *
+ * `OAuthClient` stores the active token on the instance, so a module-level
+ * client shared across requests lets one user's token be swapped in while
+ * another user's API call is in flight. Every caller gets its own instance.
+ */
+export function createOAuthClient() {
+  return new OAuthClient({
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    environment: process.env.QB_ENVIRONMENT || "sandbox",
+    redirectUri: process.env.REDIRECT_URI,
+  });
+}
 
 export function getQuickBooksApiBaseUrl() {
   const env = (process.env.QB_ENVIRONMENT || "sandbox").toLowerCase();
@@ -16,12 +25,7 @@ export function getQuickBooksApiBaseUrl() {
     : "https://sandbox-quickbooks.api.intuit.com";
 }
 
-export let oauth2_token_json = null;
 export const authurl = "/callback";
-
-export function setOAuthToken(token) {
-  oauth2_token_json = token;
-}
 
 const qbClientLogger = createModuleLogger("quickbooks-client");
 
@@ -86,8 +90,8 @@ async function loadTokenRow(userid) {
   return prisma.quickbooks_oauth_token.findUnique({ where: { userid } });
 }
 
-function setOauthClientTokenFromRow(tokenRow) {
-  oauthClient.setToken({
+function setOauthClientTokenFromRow(client, tokenRow) {
+  client.setToken({
     realmId: tokenRow.realm_id,
     token_type: "bearer",
     access_token: tokenRow.access_token,
@@ -96,14 +100,14 @@ function setOauthClientTokenFromRow(tokenRow) {
   });
 }
 
-async function refreshIfNeeded(userid, tokenRow) {
+async function refreshIfNeeded(client, userid, tokenRow) {
   const needsRefresh = !tokenRow?.expires_at || tokenRow.expires_at.getTime() <= Date.now() + 60_000;
   if (!needsRefresh) return tokenRow;
 
   qbClientLogger.info({ userid }, "Refreshing QuickBooks access token");
   try {
-    setOauthClientTokenFromRow(tokenRow);
-    const refreshed = await oauthClient.refresh();
+    setOauthClientTokenFromRow(client, tokenRow);
+    const refreshed = await client.refresh();
     const refreshedJson = refreshed?.json;
     await upsertQuickBooksToken(userid, { ...refreshedJson, realmId: tokenRow.realm_id });
     return loadTokenRow(userid);
@@ -128,11 +132,15 @@ export async function makeQuickBooksApiCall(userid, options) {
     throw e;
   }
 
-  let currentRow = await refreshIfNeeded(userid, tokenRow);
-  setOauthClientTokenFromRow(currentRow);
+  // Scoped to this call so a concurrent extraction for another user cannot
+  // swap the token out from under it.
+  const client = createOAuthClient();
+
+  let currentRow = await refreshIfNeeded(client, userid, tokenRow);
+  setOauthClientTokenFromRow(client, currentRow);
 
   try {
-    const response = await oauthClient.makeApiCall(options);
+    const response = await client.makeApiCall(options);
     
     // Capture intuit_tid for troubleshooting (non-invasive)
     const intuitTid = response.headers?.get('intuit_tid') || 
@@ -165,8 +173,8 @@ export async function makeQuickBooksApiCall(userid, options) {
       throw e;
     }
 
-    currentRow = await refreshIfNeeded(userid, await loadTokenRow(userid));
-    setOauthClientTokenFromRow(currentRow);
-    return await oauthClient.makeApiCall(options);
+    currentRow = await refreshIfNeeded(client, userid, await loadTokenRow(userid));
+    setOauthClientTokenFromRow(client, currentRow);
+    return await client.makeApiCall(options);
   }
 }
