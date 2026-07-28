@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 800" width="1100" height="800"
+     role="img" aria-label="BizExecData architecture">
+  <title>BizExecData architecture</title>
+  <style>
+    .c    { fill: #f6f8fa; stroke: #d1d9e0; stroke-width: 1; }
+    .p    { fill: #ffffff; stroke: #d1d9e0; stroke-width: 1; }
+    .ttl  { font: 600 13.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #1f2328; }
+    .ttlm { font: 600 11.5px ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; fill: #1f2328; }
+    .sub  { font: 400 10px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; }
+    .code { font: 400 9.5px ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; fill: #59636e; }
+    .gut  { font: 600 10.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; letter-spacing: .09em; }
+    .lbl  { font: 400 9.5px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; fill: #59636e; }
+    .e    { fill: none; stroke: #818b98; stroke-width: 1.5; marker-end: url(#arw); }
+    .en   { fill: none; stroke: #818b98; stroke-width: 1.5; }
+    .ed   { stroke-dasharray: 5 4; }
+    .err  { stroke: #cf222e; marker-end: url(#arw-err); }
+    .errt { fill: #cf222e; }
+  </style>
+  <defs>
+    <marker id="arw" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="9" markerHeight="9"
+            markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#818b98"/>
+    </marker>
+    <marker id="arw-err" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="9" markerHeight="9"
+            markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#cf222e"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="800" fill="#ffffff"/>
+  <text x="140" y="82" class="gut" text-anchor="end">BROWSER</text>
+  <text x="140" y="224" class="gut" text-anchor="end">EXPRESS APP</text>
+  <text x="140" y="391" class="gut" text-anchor="end">PROVIDERS</text>
+  <text x="140" y="572" class="gut" text-anchor="end">EXTRACTION</text>
+  <text x="140" y="718" class="gut" text-anchor="end">STORAGE</text>
+  <rect class="c" x="160" y="40" width="210" height="76" rx="10"/>
+  <text x="265" y="74" class="ttl" text-anchor="middle">Loading page</text>
+  <text x="265" y="96" class="sub" text-anchor="middle">polls extraction progress</text>
+  <rect class="c" x="416" y="40" width="604" height="76" rx="10"/>
+  <text x="718" y="74" class="ttl" text-anchor="middle">Provider dashboards</text>
+  <text x="718" y="96" class="sub" text-anchor="middle">EJS · Chart.js · D3 — one view set per source</text>
+  <rect class="c" x="416" y="176" width="280" height="88" rx="10"/>
+  <text x="556" y="206" class="ttl" text-anchor="middle">Route modules</text>
+  <text x="556" y="228" class="sub" text-anchor="middle">auth · user · admin</text>
+  <text x="556" y="246" class="sub" text-anchor="middle">quickbooks · xero · sage · excel</text>
+  <rect class="c" x="822" y="176" width="198" height="88" rx="10"/>
+  <text x="921" y="206" class="ttl" text-anchor="middle">JSON endpoints</text>
+  <text x="921" y="228" class="code" text-anchor="middle">/api/*</text>
+  <text x="921" y="246" class="sub" text-anchor="middle">dashboard reads</text>
+  <rect class="c" x="416" y="312" width="142" height="150" rx="10"/>
+  <rect x="428" y="312" width="118" height="3" rx="1.5" fill="#1a7f37"/>
+  <text x="487" y="342" class="ttl" text-anchor="middle" fill="#1a7f37">QuickBooks</text>
+  <text x="487" y="368" class="sub" text-anchor="middle">OAuth 2.0</text>
+  <text x="487" y="386" class="sub" text-anchor="middle">tokens in DB</text>
+  <text x="487" y="404" class="sub" text-anchor="middle">refresh at −60 s</text>
+  <text x="487" y="430" class="code" text-anchor="middle">ProfitAndLoss · Detail</text>
+  <rect class="c" x="570" y="312" width="142" height="150" rx="10"/>
+  <rect x="582" y="312" width="118" height="3" rx="1.5" fill="#0969da"/>
+  <text x="641" y="342" class="ttl" text-anchor="middle" fill="#0969da">Xero</text>
+  <text x="641" y="368" class="sub" text-anchor="middle">OAuth 2.0</text>
+  <text x="641" y="386" class="sub" text-anchor="middle">tokenSet in session</text>
+  <text x="641" y="404" class="sub" text-anchor="middle">SDK-managed refresh</text>
+  <text x="641" y="430" class="code" text-anchor="middle">getReportProfitAndLoss</text>
+  <rect class="c" x="724" y="312" width="142" height="150" rx="10"/>
+  <rect x="736" y="312" width="118" height="3" rx="1.5" fill="#8250df"/>
+  <text x="795" y="342" class="ttl" text-anchor="middle" fill="#8250df">Sage</text>
+  <text x="795" y="368" class="sub" text-anchor="middle">HTTP Basic</text>
+  <text x="795" y="386" class="sub" text-anchor="middle">AES-256-CBC creds</text>
+  <text x="795" y="404" class="sub" text-anchor="middle">held in session</text>
+  <text x="795" y="430" class="code" text-anchor="middle">ProfitAndLoss/Get</text>
+  <rect class="c" x="878" y="312" width="142" height="150" rx="10"/>
+  <rect x="890" y="312" width="118" height="3" rx="1.5" fill="#bc4c00"/>
+  <text x="949" y="342" class="ttl" text-anchor="middle" fill="#bc4c00">Excel / TXT</text>
+  <text x="949" y="368" class="sub" text-anchor="middle">no auth</text>
+  <text x="949" y="386" class="sub" text-anchor="middle">fixed template</text>
+  <text x="949" y="404" class="sub" text-anchor="middle">.xlsx · .xltx · .txt</text>
+  <text x="949" y="430" class="code" text-anchor="middle">uploads/IS.xltx</text>
+  <rect class="c" x="160" y="524" width="210" height="88" rx="10"/>
+  <text x="265" y="554" class="ttl" text-anchor="middle">extractionStatus</text>
+  <text x="265" y="578" class="sub" text-anchor="middle">in-memory progress map</text>
+  <text x="265" y="596" class="sub" text-anchor="middle">cleared one hour later</text>
+  <rect class="c" x="416" y="524" width="280" height="88" rx="10"/>
+  <text x="556" y="554" class="ttl" text-anchor="middle">Per-provider extractor</text>
+  <text x="556" y="578" class="sub" text-anchor="middle">sequential, month by month</text>
+  <text x="556" y="596" class="sub" text-anchor="middle">3 years first run · 1 year after</text>
+  <rect class="c" x="740" y="524" width="280" height="88" rx="10"/>
+  <text x="880" y="554" class="ttl" text-anchor="middle">Normaliser</text>
+  <text x="880" y="578" class="code" text-anchor="middle">{ category, amount, date }</text>
+  <text x="880" y="596" class="sub" text-anchor="middle">+ five-field monthly calc</text>
+  <rect class="c" x="568" y="676" width="300" height="76" rx="10"/>
+  <text x="718" y="708" class="ttl" text-anchor="middle" fill="#cf222e">PostgreSQL</text>
+  <text x="718" y="730" class="sub" text-anchor="middle">per-provider tables · Prisma + pg</text>
+  <path class="e" d="M556,116 V176"/>
+  <text x="564" y="150" class="lbl" text-anchor="start">connect / extract</text>
+  <path class="e" d="M921,116 V176"/>
+  <text x="929" y="150" class="lbl" text-anchor="start">read</text>
+  <path class="en" d="M556,264 V288"/>
+  <path class="en" d="M487,288 H949"/>
+  <path class="e" d="M487,288 V312"/>
+  <path class="e" d="M641,288 V312"/>
+  <path class="e" d="M795,288 V312"/>
+  <path class="e" d="M949,288 V312"/>
+  <path class="en" d="M487,462 V492"/>
+  <path class="en" d="M641,462 V492"/>
+  <path class="en" d="M795,462 V492"/>
+  <path class="en" d="M949,462 V492"/>
+  <path class="en" d="M487,492 H949"/>
+  <path class="e" d="M556,492 V524"/>
+  <path class="e" d="M696,568 H740"/>
+  <path class="e" d="M880,612 V636 A8,8 0 0,1 872,644 H726 A8,8 0 0,0 718,652 V676"/>
+  <path class="e ed" d="M265,116 V524"/>
+  <text x="273" y="326" class="lbl" text-anchor="start">poll</text>
+  <path class="e ed" d="M416,568 H370"/>
+  <text x="393" y="558" class="lbl" text-anchor="middle">writes</text>
+  <path class="e" d="M1020,220 H1052 A8,8 0 0,1 1060,228 V706 A8,8 0 0,1 1052,714 H868"/>
+  <text x="960" y="706" class="lbl" text-anchor="middle">read queries</text>
+</svg>
