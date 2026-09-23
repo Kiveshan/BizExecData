@@ -29,6 +29,13 @@ const app = express();
 // Trust proxy - required for express-rate-limit behind load balancer/reverse proxy
 app.set('trust proxy', 1);
 
+// Load balancer health check. Registered before logging and sessions so the
+// probe every few seconds neither floods the logs nor touches the database;
+// a DB outage should not make ECS kill healthy containers.
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();

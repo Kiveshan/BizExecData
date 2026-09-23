@@ -1,0 +1,19 @@
+# Keep the build context small and never bake secrets or local state into the image.
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+coverage
+uploads
+docs
+infra
+*.log
+
+# Regenerated inside the image for the container's platform.
+src/generated
+
+# Tests and legacy static pages are not served in production.
+src/__tests__
+public/_legacy_html

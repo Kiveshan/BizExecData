@@ -51,6 +51,7 @@ const prisma = {
 jest.unstable_mockModule('../../config/prismaClient.js', () => ({
   getPrismaClient: () => prisma,
   getPgPool: jest.fn(),
+  closeDatabase: jest.fn(),
 }));
 
 const { default: app } = await import('../../app.js');
@@ -106,6 +107,17 @@ beforeEach(() => {
   for (const ip of ['::ffff:127.0.0.1', '127.0.0.1', '::1']) {
     app.authLimiter.resetKey(ip);
   }
+});
+
+describe('GET /health', () => {
+  it('answers without a session or database access', async () => {
+    const res = await request(app).get('/health');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.headers['set-cookie']).toBeUndefined();
+    expect(prisma.user_table.findUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe('data API authentication', () => {

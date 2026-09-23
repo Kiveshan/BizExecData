@@ -17,7 +17,7 @@ describe('validateEnv', () => {
   });
 
   it.each([
-    ['DATABASE_URL', undefined, /DATABASE_URL is not set/],
+    ['DATABASE_URL', undefined, /DATABASE_URL \(or DB_HOST\/DB_NAME\/DB_USER\/DB_PASSWORD\) is not set/],
     ['SESSION_SECRET', undefined, /SESSION_SECRET is not set/],
     ['SESSION_SECRET', 'short', /at least 32 characters/],
     ['SESSION_SECRET', 'default-secret-change-in-production', /example placeholder/],

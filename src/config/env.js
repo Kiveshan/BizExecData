@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { resolveDatabaseUrl } from "./databaseUrl.js";
 
 dotenv.config();
 
@@ -30,8 +31,8 @@ export function validateEnv(env = process.env) {
 
   const problems = [];
 
-  if (!env.DATABASE_URL) {
-    problems.push("DATABASE_URL is not set");
+  if (!resolveDatabaseUrl(env)) {
+    problems.push("DATABASE_URL (or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD) is not set");
   }
 
   const sessionSecret = env.SESSION_SECRET;
