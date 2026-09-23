@@ -10,6 +10,7 @@ import fileUpload from "express-fileupload";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import initializePassport from "./config/passport.js";
+import { validateEnv } from "./config/env.js";
 import { createSessionMiddleware } from "./middleware/session.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import logger, { createModuleLogger } from "./utils/logger.js";
@@ -20,12 +21,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+validateEnv();
 appLogger.info("Environment loaded", { nodeEnv: process.env.NODE_ENV });
 
 const app = express();
 
 // Trust proxy - required for express-rate-limit behind load balancer/reverse proxy
 app.set('trust proxy', 1);
+
+// Load balancer health check. Registered before logging and sessions so the
+// probe every few seconds neither floods the logs nor touches the database;
+// a DB outage should not make ECS kill healthy containers.
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 // Request logging middleware
 app.use((req, res, next) => {

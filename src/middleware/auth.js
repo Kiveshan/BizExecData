@@ -5,6 +5,16 @@ export function checkAuthenticated(req, res, next) {
   res.redirect("/login");
 }
 
+// For JSON endpoints. The handlers filter by `req.session.userid`, and Prisma
+// drops an `undefined` filter entirely, so letting a request through without
+// one would return every user's rows.
+export function requireApiAuth(req, res, next) {
+  if (req.session?.userid) {
+    return next();
+  }
+  res.status(401).json({ error: "Not authenticated" });
+}
+
 export function checkNotAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return res.redirect("/dashboard");

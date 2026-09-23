@@ -1,8 +1,8 @@
-import app, { __dirname, errorHandler, notFoundHandler } from "./src/app.js";
+import app, { errorHandler, notFoundHandler } from "./src/app.js";
 import { port } from "./src/config/env.js";
 import express from "express";
-import path from "path";
-import logger, { createModuleLogger } from "./src/utils/logger.js";
+import { createModuleLogger } from "./src/utils/logger.js";
+import { closeDatabase } from "./src/config/prismaClient.js";
 
 const serverLogger = createModuleLogger("server");
 
@@ -147,6 +147,35 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start the server
-app.listen(port, () => {
+const server = app.listen(port, () => {
   serverLogger.info({ port, env: process.env.NODE_ENV || "production" }, "Server started successfully");
 });
+
+// ECS sends SIGTERM when replacing a task during a deploy. Stop accepting new
+// connections, let in-flight requests finish, then release the DB pool.
+// The load balancer has already begun draining this target by then.
+const SHUTDOWN_TIMEOUT_MS = 20_000;
+
+function shutdown(signal) {
+  serverLogger.info({ signal }, "Shutdown signal received, draining connections");
+
+  const forceExit = setTimeout(() => {
+    serverLogger.error("Graceful shutdown timed out, forcing exit");
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExit.unref();
+
+  server.close(async (err) => {
+    if (err) serverLogger.error({ err }, "Error closing HTTP server");
+    try {
+      await closeDatabase();
+    } catch (dbErr) {
+      serverLogger.error({ err: dbErr }, "Error closing database connections");
+    }
+    serverLogger.info("Shutdown complete");
+    process.exit(err ? 1 : 0);
+  });
+}
+
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));

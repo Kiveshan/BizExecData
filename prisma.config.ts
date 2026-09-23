@@ -2,6 +2,7 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { resolveDatabaseUrl } from "./src/config/databaseUrl.js";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -9,6 +10,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Same resolution as the app, so the ECS migration task can use split DB_* secrets.
+    url: resolveDatabaseUrl(),
   },
 });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import path from "path";
-import { checkAuthenticated } from "../../middleware/auth.js";
+import { checkAuthenticated, requireApiAuth } from "../../middleware/auth.js";
 import {
   checkDateExistsInDb,
   extractDateFromExcel,
@@ -204,10 +204,10 @@ router.post("/amend", checkAuthenticated, async (req, res) => {
   }
 });
 
-router.get("/api/excompany", getExcelCompanyData);
-router.get("/api/exprofit", getExcelProfitData);
-router.get("/api/exexpenses", getExcelExpensesData);
-router.get("/api/ex_income", getExcelIncomeData);
-router.get("/api/ex_costofsales", getExcelCostOfSalesData);
+router.get("/api/excompany", requireApiAuth, getExcelCompanyData);
+router.get("/api/exprofit", requireApiAuth, getExcelProfitData);
+router.get("/api/exexpenses", requireApiAuth, getExcelExpensesData);
+router.get("/api/ex_income", requireApiAuth, getExcelIncomeData);
+router.get("/api/ex_costofsales", requireApiAuth, getExcelCostOfSalesData);
 
 export default router;

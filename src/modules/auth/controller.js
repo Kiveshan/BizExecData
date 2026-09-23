@@ -14,9 +14,9 @@ export async function login(req, res, next) {
   passport.authenticate("local", async (err, user) => {
     try {
       if (err || !user) {
-        authControllerLogger.warn({ email: req.body.email }, "Login failed - user not found or error");
+        authControllerLogger.warn({ email: req.body.email }, "Login failed - invalid credentials or error");
         return res.render("login", {
-          error: "Account does not exsist please register",
+          error: "Invalid email or password",
         });
       }
 

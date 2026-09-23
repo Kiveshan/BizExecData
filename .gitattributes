@@ -1,0 +1,12 @@
+# Files executed inside Linux containers or by Terraform must keep LF endings,
+# otherwise a Windows checkout breaks Dockerfile line continuations.
+Dockerfile text eol=lf
+*.sh       text eol=lf
+*.tf       text eol=lf
+*.tfvars   text eol=lf
+*.hcl      text eol=lf
+
+# Prisma checksums each migration.sql byte-for-byte and compares it with the
+# checksum recorded when it was applied. Never convert line endings here:
+# a changed byte makes an already-applied migration look edited.
+prisma/migrations/**/migration.sql -text
