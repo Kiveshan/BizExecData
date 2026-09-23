@@ -21,8 +21,9 @@ resource "aws_db_parameter_group" "postgres17" {
   family = "postgres17"
 
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot" # what RDS reports back; avoids a perpetual diff
   }
 
   parameter {
@@ -39,6 +40,10 @@ resource "aws_db_instance" "main" {
   storage_type      = "gp3"
   allocated_storage = 20
   multi_az          = var.db_multi_az
+
+  # Inherited from the (encrypted) snapshot. Must be stated: left unset,
+  # Terraform reads it as "not encrypted" and plans to REPLACE the instance.
+  storage_encrypted = true
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.db.id]
@@ -59,6 +64,10 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier = "bizexec-db-final"
 
   lifecycle {
+    # Any plan that would destroy or replace the database fails outright
+    # instead of relying on someone spotting "must be replaced" in a diff.
+    prevent_destroy = true
+
     # Only meaningful at creation; changing it later must never trigger a
     # replace (which would restore over live data).
     ignore_changes = [snapshot_identifier]

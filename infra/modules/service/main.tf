@@ -226,7 +226,27 @@ resource "aws_lb_target_group" "this" {
   }
 }
 
+resource "aws_lb_listener_rule" "this" {
+  listener_arn = var.listener_arn
+  priority     = var.listener_rule_priority
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+
+  condition {
+    host_header {
+      values = var.hosts
+    }
+  }
+}
+
 resource "aws_ecs_service" "this" {
+  # ECS refuses to attach a service to a target group that no listener uses
+  # yet, so the rule must exist first.
+  depends_on = [aws_lb_listener_rule.this]
+
   name            = local.name
   cluster         = var.cluster_arn
   task_definition = aws_ecs_task_definition.app.arn

@@ -42,14 +42,20 @@ RUN apt-get update \
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    DB_SSL_CA_PATH=/app/certs/rds-global-bundle.pem
+    DB_SSL_CA_PATH=/etc/ssl/certs/rds-global-bundle.pem
 
 # AWS's published CA bundle, so the app verifies the RDS TLS certificate.
-ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/rds-global-bundle.pem
+# Goes into an existing directory: ADD --chmod also applies the mode to any
+# directory it creates, and a 644 directory cannot be entered by non-root.
+ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 
 COPY --from=build --chown=node:node /app /app
 
 USER node
+
+# Fail the build, not the deploy, if the runtime user cannot read the bundle.
+RUN test -r "$DB_SSL_CA_PATH" && grep -q "BEGIN CERTIFICATE" "$DB_SSL_CA_PATH"
+
 EXPOSE 3000
 
 # The same image runs migrations as a one-off ECS task:

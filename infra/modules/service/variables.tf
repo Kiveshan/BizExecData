@@ -19,6 +19,20 @@ variable "security_group_id" {
   type = string
 }
 
+variable "listener_arn" {
+  description = "HTTPS listener the environment's host rule is attached to."
+  type        = string
+}
+
+variable "listener_rule_priority" {
+  type = number
+}
+
+variable "hosts" {
+  description = "Host headers routed to this environment."
+  type        = list(string)
+}
+
 variable "image" {
   description = "Full image reference used when the task definitions are first created."
   type        = string

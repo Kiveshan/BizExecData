@@ -35,6 +35,10 @@ module "service" {
   security_group_id = aws_security_group.app.id
   image             = "${aws_ecr_repository.app.repository_url}:${var.initial_image_tag}"
 
+  listener_arn           = aws_lb_listener.https.arn
+  listener_rule_priority = each.key == "production" ? 10 : 20
+  hosts                  = local.hosts[each.key]
+
   desired_count          = each.value.desired_count
   public_url             = each.value.public_url
   quickbooks_environment = each.value.quickbooks_environment

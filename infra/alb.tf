@@ -89,20 +89,5 @@ resource "aws_lb_listener" "https" {
   }
 }
 
-resource "aws_lb_listener_rule" "host" {
-  for_each = local.hosts
-
-  listener_arn = aws_lb_listener.https.arn
-  priority     = each.key == "production" ? 10 : 20
-
-  action {
-    type             = "forward"
-    target_group_arn = module.service[each.key].target_group_arn
-  }
-
-  condition {
-    host_header {
-      values = each.value
-    }
-  }
-}
+# Per-environment host rules live in modules/service so each ECS service can
+# depend on its own rule.
