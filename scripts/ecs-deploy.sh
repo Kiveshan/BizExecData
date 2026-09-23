@@ -105,20 +105,27 @@ log "Registered $app_def, updating $SERVICE"
 aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
   --task-definition "$app_def" --query 'service.serviceName' --output text >/dev/null
 
-log "Waiting for $SERVICE to become stable"
-aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE" || true
+# Not `aws ecs wait services-stable`: right after update-service the new
+# deployment may not be visible yet, so the old one briefly looks "stable"
+# and the waiter returns at once; it also succeeds after a circuit-breaker
+# rollback. Instead, follow the deployment of *our* revision to its outcome.
+log "Waiting for the $SERVICE rollout to finish"
+deadline=$((SECONDS + 1200))
+while :; do
+  # shellcheck disable=SC2016 # backticks are JMESPath literals, not shell
+  read -r deploy_status rollout_state < <(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+    --query "services[0].deployments[?taskDefinition=='${app_def}'] | [0].[status, rolloutState]" --output text)
 
-# services-stable also succeeds after a circuit-breaker rollback, so confirm
-# the primary deployment is actually the revision we just registered.
-# shellcheck disable=SC2016 # backticks are JMESPath literals, not shell
-read -r primary_def rollout_state < <(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-  --query 'services[0].deployments[?status==`PRIMARY`] | [0].[taskDefinition, rolloutState]' --output text)
-
-if [ "$primary_def" != "$app_def" ] || [ "$rollout_state" != "COMPLETED" ]; then
-  log "Deployment did not complete: primary=$primary_def state=$rollout_state"
-  aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-    --query 'services[0].events[:10].[createdAt,message]' --output text
-  exit 1
-fi
+  if [ "$deploy_status" = "PRIMARY" ] && [ "$rollout_state" = "COMPLETED" ]; then
+    break
+  fi
+  if [ "$rollout_state" = "FAILED" ] || [ "$deploy_status" = "INACTIVE" ] || [ "$SECONDS" -ge "$deadline" ]; then
+    log "Deployment did not complete: status=$deploy_status state=$rollout_state"
+    aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
+      --query 'services[0].events[:10].[createdAt,message]' --output text
+    exit 1
+  fi
+  sleep 15
+done
 
 log "Deployed $IMAGE to $ENV"
