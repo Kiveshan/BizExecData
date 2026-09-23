@@ -1,19 +1,11 @@
-# staging.* goes straight to the new ALB. The apex and www follow
-# var.prod_dns_target so the production cutover — and its rollback — is a
-# one-variable change.
-
-import {
-  to = aws_route53_record.apex
-  id = "${data.aws_route53_zone.main.zone_id}_${var.domain}_A"
-}
+# Apex, www and staging all alias the ECS load balancer. (The Elastic
+# Beanstalk fallback used during the 2026-09-23 cutover was removed once EB
+# was terminated.)
 
 locals {
-  prod_alias = var.prod_dns_target == "ecs" ? {
+  prod_alias = {
     name    = aws_lb.main.dns_name
     zone_id = aws_lb.main.zone_id
-    } : {
-    name    = var.legacy_eb_dns_name
-    zone_id = "Z1EI3BVKMKK4AM" # Elastic Beanstalk, af-south-1
   }
 }
 

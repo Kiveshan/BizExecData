@@ -57,9 +57,9 @@ aws logs tail /ecs/bizexec-production --follow
 6. Fill `bizexec/<env>/integrations`
 7. `scripts/ecs-deploy.sh <env> <image> --bootstrap` for staging, then production
 8. `scripts/ecs-deploy.sh staging <image>`, verify, then production
-9. Cutover: `prod_dns_target = "ecs"` → apply. Roll back: set it to `"eb"` → apply.
+9. DNS cutover from Elastic Beanstalk to this stack (done 2026-09-23; EB has since been terminated)
 
 ## Rolling back
 
 - **Bad deploy:** ECS rolls back by itself. To pin an older image, rerun `scripts/ecs-deploy.sh <env> <older-image>`.
-- **Cutover problem:** `prod_dns_target = "eb"`, `terraform apply`.
+- **Bad data change:** RDS keeps 7 days of automated backups (point-in-time restore). The pre-migration database is kept as snapshots `bizexec-prod-migration-20260923` and `bizexec-prod-final-20260923`.
