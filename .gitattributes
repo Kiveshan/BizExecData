@@ -1,0 +1,7 @@
+# Files executed inside Linux containers or by Terraform must keep LF endings,
+# otherwise a Windows checkout breaks Dockerfile line continuations.
+Dockerfile text eol=lf
+*.sh       text eol=lf
+*.tf       text eol=lf
+*.tfvars   text eol=lf
+*.hcl      text eol=lf

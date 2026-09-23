@@ -24,6 +24,7 @@ COPY src/config/databaseUrl.js ./src/config/databaseUrl.js
 RUN npx prisma generate
 
 COPY server.js ./
+COPY scripts ./scripts
 COPY src ./src
 COPY views ./views
 COPY public ./public
