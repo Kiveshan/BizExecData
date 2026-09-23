@@ -10,6 +10,7 @@ import fileUpload from "express-fileupload";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import initializePassport from "./config/passport.js";
+import { validateEnv } from "./config/env.js";
 import { createSessionMiddleware } from "./middleware/session.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import logger, { createModuleLogger } from "./utils/logger.js";
@@ -20,6 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+validateEnv();
 appLogger.info("Environment loaded", { nodeEnv: process.env.NODE_ENV });
 
 const app = express();

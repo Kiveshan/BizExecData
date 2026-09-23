@@ -21,6 +21,7 @@ import {
   extractionStatus,
 } from "./extractor.js";
 import { formatDate } from "../../utils/file.js";
+import { checkAuthenticated } from "../../middleware/auth.js";
 import { createModuleLogger } from "../../utils/logger.js";
 
 const qbRouteLogger = createModuleLogger("quickbooks-routes");
@@ -212,7 +213,7 @@ router.get(authurl, async (req, res) => {
   }
 });
 
-router.get("/update", async (req, res) => {
+router.get("/update", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const currentDate = new Date();
@@ -316,7 +317,7 @@ router.get("/update", async (req, res) => {
   res.redirect("/fetch-income");
 });
 
-router.get("/fetch-income", async (req, res) => {
+router.get("/fetch-income", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
@@ -354,7 +355,7 @@ router.get("/fetch-income", async (req, res) => {
   res.redirect("/fetch-cost");
 });
 
-router.get("/fetch-cost", async (req, res) => {
+router.get("/fetch-cost", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
@@ -392,7 +393,7 @@ router.get("/fetch-cost", async (req, res) => {
   res.redirect("/fetch-expenses");
 });
 
-router.get("/fetch-expenses", async (req, res) => {
+router.get("/fetch-expenses", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
@@ -430,7 +431,7 @@ router.get("/fetch-expenses", async (req, res) => {
   res.redirect("/fetch-otherexpenses");
 });
 
-router.get("/fetch-otherexpenses", async (req, res) => {
+router.get("/fetch-otherexpenses", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";
@@ -468,7 +469,7 @@ router.get("/fetch-otherexpenses", async (req, res) => {
   res.redirect("/fetch-otherincome");
 });
 
-router.get("/fetch-otherincome", async (req, res) => {
+router.get("/fetch-otherincome", checkAuthenticated, async (req, res) => {
   const userid = req.session.userid;
   const companyID = await getQuickBooksRealmId(userid);
   const startDate = "2024-01-01";

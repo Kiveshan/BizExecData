@@ -3,7 +3,7 @@ import jsonpath from "jsonpath";
 import crypto from "crypto";
 import { createXeroClient } from "./client.js";
 import { getPrismaClient } from "../../config/prismaClient.js";
-import { checkAuthenticated } from "../../middleware/auth.js";
+import { checkAuthenticated, requireApiAuth } from "../../middleware/auth.js";
 import {
   processXeroData,
   extractionStatus,
@@ -309,7 +309,7 @@ router.get("/xeroexpenses", checkAuthenticated, (req, res) => {
   res.render("xeroexpenses");
 });
 
-router.get("/api/xerocompany", async (req, res) => {
+router.get("/api/xerocompany", requireApiAuth, async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero company data");
@@ -333,7 +333,7 @@ router.get("/api/xerocompany", async (req, res) => {
   }
 });
 
-router.get("/api/xeroprofit", async (req, res) => {
+router.get("/api/xeroprofit", requireApiAuth, async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero profit data");
@@ -351,7 +351,7 @@ router.get("/api/xeroprofit", async (req, res) => {
   }
 });
 
-router.get("/api/xeroexpenses", async (req, res) => {
+router.get("/api/xeroexpenses", requireApiAuth, async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero expenses data");
@@ -374,7 +374,7 @@ router.get("/api/xeroexpenses", async (req, res) => {
   }
 });
 
-router.get("/api/xerorevenue", async (req, res) => {
+router.get("/api/xerorevenue", requireApiAuth, async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero revenue data");
@@ -392,7 +392,7 @@ router.get("/api/xerorevenue", async (req, res) => {
   }
 });
 
-router.get("/api/xerocostofsales", async (req, res) => {
+router.get("/api/xerocostofsales", requireApiAuth, async (req, res) => {
   const prisma = getPrismaClient();
   const userid = req.session.userid;
   xeroRouteLogger.debug({ userid }, "Fetching Xero cost of sales data");

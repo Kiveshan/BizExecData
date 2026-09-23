@@ -210,6 +210,16 @@ model xero_revenue {
   user_table user_table? @relation(fields: [userid], references: [userid], onUpdate: Cascade, onDelete: Cascade)
 }
 
+// express-session store (connect-pg-simple). Shape must match what that
+// library reads and writes.
+model session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+}
+
 model quickbooks_oauth_token {
   id            Int      @id @default(autoincrement())
   userid        Int      @unique

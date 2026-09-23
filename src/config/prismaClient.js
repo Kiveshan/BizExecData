@@ -7,11 +7,16 @@ const { PrismaClient } = prismaPkg;
 const { Pool } = pg;
 
 let prisma;
+let pool;
 
 const prismaClientLogger = createModuleLogger("prisma-client");
 
-export function getPrismaClient() {
-  if (prisma) return prisma;
+/**
+ * The single pg pool shared by Prisma and the session store, so the app
+ * holds one set of database connections rather than two.
+ */
+export function getPgPool() {
+  if (pool) return pool;
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -38,8 +43,14 @@ export function getPrismaClient() {
     prismaClientLogger.warn({ ssl: Boolean(ssl) }, "Initializing PrismaClient (unable to parse DATABASE_URL)");
   }
 
-  const pool = new Pool({ connectionString, ssl });
-  const adapter = new PrismaPg(pool);
+  pool = new Pool({ connectionString, ssl });
+  return pool;
+}
+
+export function getPrismaClient() {
+  if (prisma) return prisma;
+
+  const adapter = new PrismaPg(getPgPool());
   prisma = new PrismaClient({ adapter });
   return prisma;
 }

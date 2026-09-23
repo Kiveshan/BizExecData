@@ -10,7 +10,7 @@ export const securityConfig = {
     allowedHeaders: ["Content-Type", "Authorization"],
   },
   session: {
-    secret: process.env.SESSION_SECRET || "default-secret-change-in-production",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {

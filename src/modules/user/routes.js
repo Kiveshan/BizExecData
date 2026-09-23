@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { checkAuthenticated } from "../../middleware/auth.js";
+import { checkAuthenticated, requireApiAuth } from "../../middleware/auth.js";
 import {
   getDashboard,
   getCompanyData,
@@ -31,10 +31,10 @@ router.get("/expenses", checkAuthenticated, (req, res) => {
   res.render("expenses");
 });
 
-router.get("/api/company", getCompanyData);
-router.get("/api/profit", getProfitData);
-router.get("/api/revenue", getRevenueData);
-router.get("/api/costofsales", getCostOfSalesData);
-router.get("/api/expenses", getExpensesData);
+router.get("/api/company", requireApiAuth, getCompanyData);
+router.get("/api/profit", requireApiAuth, getProfitData);
+router.get("/api/revenue", requireApiAuth, getRevenueData);
+router.get("/api/costofsales", requireApiAuth, getCostOfSalesData);
+router.get("/api/expenses", requireApiAuth, getExpensesData);
 
 export default router;
