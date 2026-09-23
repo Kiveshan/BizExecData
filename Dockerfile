@@ -7,7 +7,7 @@
 ARG NODE_VERSION=24
 
 # ─── build ────────────────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION}-bookworm-slim AS build
+FROM node:${NODE_VERSION}-trixie-slim AS build
 WORKDIR /app
 
 # Toolchain is only used if no prebuilt bcrypt binary matches the platform.
@@ -30,11 +30,13 @@ COPY views ./views
 COPY public ./public
 
 # ─── runtime ──────────────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM node:${NODE_VERSION}-trixie-slim AS runtime
 WORKDIR /app
 
 # Prisma detects the OpenSSL version at runtime; the slim image ships without it.
+# upgrade pulls in Debian security fixes published since the base image was cut.
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends openssl \
  && rm -rf /var/lib/apt/lists/*
 
