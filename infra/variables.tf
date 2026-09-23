@@ -38,25 +38,6 @@ variable "db_multi_az" {
   default     = true
 }
 
-# ─── Cutover ─────────────────────────────────────────────────────────────────
-
-variable "prod_dns_target" {
-  description = "Where bizexecdata.co.za points: \"eb\" (old Elastic Beanstalk) or \"ecs\". Flip back to \"eb\" to roll back."
-  type        = string
-  default     = "eb"
-
-  validation {
-    condition     = contains(["eb", "ecs"], var.prod_dns_target)
-    error_message = "prod_dns_target must be \"eb\" or \"ecs\"."
-  }
-}
-
-variable "legacy_eb_dns_name" {
-  description = "Old EB environment hostname, used while prod_dns_target = \"eb\"."
-  type        = string
-  default     = "bizexec-env.eba-ttttm6er.af-south-1.elasticbeanstalk.com"
-}
-
 # ─── Services ────────────────────────────────────────────────────────────────
 
 variable "initial_image_tag" {
