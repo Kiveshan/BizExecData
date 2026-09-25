@@ -1,0 +1,58 @@
+<script>
+  // Keeps the Year / Month / Trend filters in sync across one provider's dashboard tabs.
+  // Each page calls DashboardFilters.init() once its dropdowns are populated
+  // and its own change handlers are attached.
+  window.DashboardFilters = (function () {
+    const STORAGE_KEY = '<%= provider %>DashboardFilters';
+
+    function els() {
+      return {
+        year:  document.getElementById('yearSelect'),
+        month: document.getElementById('monthSelect'),
+        six:   document.getElementById('sixMonthsToggle'),
+        three: document.getElementById('threeMonthsToggle')
+      };
+    }
+
+    function load() {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+    }
+
+    function save() {
+      const e = els();
+      const trend = e.six.checked ? '6' : e.three.checked ? '3' : null;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ year: e.year.value, month: e.month.value, trend }));
+      } catch (err) { /* storage unavailable: filters just won't carry over */ }
+    }
+
+    function hasOption(select, value) {
+      return Array.from(select.options).some(o => o.value === value);
+    }
+
+    function apply(state) {
+      const e = els();
+      if (state.trend === '6' || state.trend === '3') {
+        const toggle = state.trend === '6' ? e.six : e.three;
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change'));
+        return;
+      }
+      // Skip values this page's data doesn't have and keep its default instead.
+      if (!hasOption(e.year, state.year) || !hasOption(e.month, state.month)) return;
+      e.year.value = state.year;
+      e.month.value = state.month;
+      e.year.dispatchEvent(new Event('change'));
+    }
+
+    function init() {
+      const e = els();
+      [e.year, e.month, e.six, e.three].forEach(el => el.addEventListener('change', save));
+      const state = load();
+      if (state) apply(state);
+      save();
+    }
+
+    return { init };
+  })();
+</script>

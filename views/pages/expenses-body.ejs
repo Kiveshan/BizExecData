@@ -1,4 +1,5 @@
 <%- include('../partials/quickbooks_navbar') %>
+<%- include('../partials/dashboard_filters', { provider: 'quickbooks' }) %>
 
 <div id="sidebar">
   <%- include('../partials/sidebar') %>
@@ -225,6 +226,7 @@
         populateYearButtons(profitData.map(r => formatYear(r.date)), year);
         initializeCharts(profitData, expensesData);
         updateCharts();
+        DashboardFilters.init();
       })
       .catch(err => console.error('Error fetching data:', err));
     }

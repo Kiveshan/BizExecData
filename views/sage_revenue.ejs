@@ -46,6 +46,7 @@
 </head>
 <body>
   <%- include("partials/sage_navbar") %>
+  <%- include("partials/dashboard_filters", { provider: 'sage' }) %>
   <%- include("partials/sage_sidebar") %>
 
   <div class="main-content">
@@ -215,6 +216,7 @@
         populateYearSelect(grossData.map(r => formatYear(r.date)),   formatYear(lastEntryDate));
         initializeCharts(grossData, salesData, costofsalesData);
         updateCharts();
+        DashboardFilters.init();
       })
       .catch(err => console.error('Error fetching data:', err));
     }

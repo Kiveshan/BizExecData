@@ -1,4 +1,5 @@
 <%- include('../partials/ex_navbar') %>
+<%- include('../partials/dashboard_filters', { provider: 'excel' }) %>
 
 <div id="sidebar">
   <%- include('../partials/ex_sidebar') %>
@@ -184,6 +185,7 @@
         updateProfitChart(profitData);
         updateIncomeChart(incomeData);
         updateCharts();
+        DashboardFilters.init();
       })
       .catch(error => console.error('Error fetching data:', error));
     }
