@@ -26,7 +26,7 @@ The four provider lanes are deliberately parallel rather than unified: each keep
 What actually happens from a cold start, including the parts that will block you on a fresh install:
 
 1. **Register** (`POST /register`) — creates a `user_table` row with `roleid = 4` and `status = "pending"`, plus a `license_management` row with `status = "Pending"`.
-2. **Admin approval** — login is refused until *both* `user_table.status = "approved"` **and** the user's license `status = "Paid"` ([auth/controller.js](src/modules/auth/controller.js)). An admin is any user with `roleid = 10` ([middleware/admin.js](src/middleware/admin.js)); they approve from `/companyregapplications` and mark licenses paid from `/licensemgt`.
+2. **Admin approval** — login is refused until *both* `user_table.status = "approved"` **and** the user's license `status = "Paid"` ([auth/controller.js](src/modules/auth/controller.js)). An admin is any user with `roleid = 3` (`system_administrator`, checked by `checkAdmin` in [middleware/auth.js](src/middleware/auth.js)); they approve from `/companyregapplications` and mark licenses paid from `/licensemgt`.
 3. **Connect a source** — the user is sent through the auth flow for their chosen provider, or straight to the upload page for Excel.
 4. **Extract** — `POST /start-*-extraction` kicks off processing without blocking the response. The browser is parked on a loading page that polls `check-*-extraction` for `{progress, complete, total}`.
 5. **Dashboards** — per-provider EJS views read the normalised rows back through `api/*`.
@@ -53,7 +53,7 @@ What actually happens from a cold start, including the parts that will block you
 | Chart.js + D3 | Client-side charts on the dashboards. |
 | EJS | Server-rendered views and partials per provider. |
 | Pino | Structured, per-module logging. |
-| Jest + Supertest | Tests for the app boot path, auth middleware, and the four P&L normalisers against recorded fixtures. |
+| Jest + Supertest | Tests for the app boot path, auth middleware, route security, config, and the four P&L normalisers against recorded fixtures. |
 
 Intuit's App Store security requirements and how they are met are documented separately in [SECURITY_COMPLIANCE.md](SECURITY_COMPLIANCE.md).
 
@@ -161,11 +161,11 @@ npm run lint
 npm run lint:fix
 ```
 
-55 tests across 6 suites. Beyond the app boot path and auth middleware, the bulk of it covers the four P&L normalisers against **recorded fixtures** — one captured response shape per provider ([src/\_\_tests\_\_/fixtures/](src/__tests__/fixtures/)), plus the committed `uploads/IS1.xlsx` template standing in as its own fixture for the Excel path.
+104 tests across 9 suites. Beyond the app boot path, auth middleware, route-level security checks and env/database-URL config, the bulk of it covers the four P&L normalisers against **recorded fixtures** — one captured response shape per provider ([src/\_\_tests\_\_/fixtures/](src/__tests__/fixtures/)), plus the committed `uploads/IS1.xlsx` template standing in as its own fixture for the Excel path.
 
 The normaliser tests are the ones that earn their keep: each provider returns a structurally different report, and these pin down exactly which rows are picked up, which are deliberately skipped, and what happens when a section or total is missing. Where a report carries both line items and its own totals, the tests assert the line items **reconcile** against the total rather than just matching a hardcoded number — which is what caught the Excel cost-of-goods bug described under [Issues found and fixed](#issues-found-and-fixed).
 
-[`.github/workflows/deploy-prod.yaml`](.github/workflows/deploy-prod.yaml) runs migrations, ESLint and the test suite on every push to `main`, then packages the app and deploys it to AWS Elastic Beanstalk (`af-south-1`). There is no staging workflow.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs ESLint, the test suite, `terraform fmt`/`validate` and an image build on every pull request. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push to `main`: tests, then a single arm64 image pushed to ECR, then staging on AWS ECS Fargate (`af-south-1`) — migrations as a one-off task, rolling update, `/health` smoke test — then a manual approval before the same image goes to production. Both environments are deployed by [`scripts/ecs-deploy.sh`](scripts/ecs-deploy.sh); infrastructure is Terraform in [`infra/`](infra/README.md).
 
 ## Project structure
 
@@ -194,16 +194,19 @@ BizExecData/
 │   │   └── excel/             #   workbook/txt parsing, upload + amend flows
 │   ├── utils/                 # crypto (AES), file/date helpers, logger, validation
 │   ├── generated/prisma/      # Generated Prisma client — gitignored
-│   └── __tests__/             # Jest: boot path, auth middleware, P&L normalisers
+│   └── __tests__/             # Jest: boot path, auth middleware, security, config, P&L normalisers
 │       ├── fixtures/          #   recorded provider report shapes
 │       └── modules/           #   xero/quickbooks/sage/excel normaliser tests
 ├── views/                     # EJS templates
 │   ├── layouts/               #   page layout
-│   ├── pages/                 #   per-provider head/body fragments
+│   ├── pages/                 #   head/body fragments for QuickBooks, Xero and Excel pages (Sage pages are standalone sage_*.ejs)
 │   └── partials/              #   navbars, sidebars, footer (per provider)
 ├── public/                    # Static assets, styles, and _legacy_html/ (pre-EJS pages, unused)
 ├── uploads/                   # Excel income-statement templates (IS1.xlsx doubles as a test fixture)
-└── .github/workflows/         # Elastic Beanstalk deploy (prod, on push to main)
+├── infra/                     # Terraform: ECS Fargate, ALB, RDS, ECR, DNS, secrets (see infra/README.md)
+├── scripts/                   # ecs-deploy.sh (migrate + roll one env), db-bootstrap.js (DB + app role)
+├── Dockerfile                 # Image built once in CI, promoted staging → production
+└── .github/workflows/         # ci.yml (PRs), deploy.yml (main → staging → approval → production)
 ```
 
 ## Issues found and fixed
