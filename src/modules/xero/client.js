@@ -1,7 +1,10 @@
 import { XeroClient } from "xero-node";
 
+// Read-only, and only what the app calls: the P&L report
+// (accounting.reports.read), organisation details fetched by updateTenants()
+// (accounting.settings.read), and refresh tokens (offline_access).
 export const scopes =
-  "openid profile email accounting.settings accounting.reports.read accounting.journals.read accounting.contacts accounting.attachments accounting.transactions offline_access";
+  "accounting.reports.read accounting.settings.read offline_access";
 
 function baseConfig() {
   return {
